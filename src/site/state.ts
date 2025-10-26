@@ -7,6 +7,7 @@ export type AuthOverride = {
   api_username?: string;
   user_api_key?: string;
   user_api_client_id?: string;
+  cookies?: string; // Cookie string in format "name1=value1; name2=value2"
 };
 
 function normalizeBase(url: string): string {
@@ -28,6 +29,8 @@ export class SiteState {
       timeoutMs: number;
       defaultAuth: AuthMode;
       authOverrides?: AuthOverride[];
+      useCloudscraper?: boolean;
+      pythonPath?: string;
     }
   ) {}
 
@@ -48,11 +51,15 @@ export class SiteState {
     if (cached) return { base, client: cached };
 
     const auth = this.resolveAuthForSite(base);
+    const cookies = this.resolveCookiesForSite(base);
     const client = new HttpClient({
       baseUrl: base,
       timeoutMs: this.opts.timeoutMs,
       logger: this.opts.logger,
       auth,
+      initialCookies: cookies,
+      useCloudscraper: this.opts.useCloudscraper,
+      pythonPath: this.opts.pythonPath,
     } as any);
     this.clientCache.set(base, client);
     return { base, client };
@@ -74,6 +81,12 @@ export class SiteState {
       if (match.api_key) return { type: "api_key", key: match.api_key, username: match.api_username };
     }
     return this.opts.defaultAuth;
+  }
+
+  private resolveCookiesForSite(base: string): string | undefined {
+    const overrides = this.opts.authOverrides || [];
+    const match = overrides.find((o) => normalizeBase(o.site) === base || this.sameOrigin(o.site, base));
+    return match?.cookies;
   }
 
   private sameOrigin(a: string, b: string): boolean {

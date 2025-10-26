@@ -39,6 +39,7 @@ const ProfileSchema = z
             api_username: z.string().optional(),
             user_api_key: z.string().optional(),
             user_api_client_id: z.string().optional(),
+            cookies: z.string().optional().describe("Cookie string in format 'name1=value1; name2=value2'"),
           })
           .strict()
       )
@@ -61,6 +62,8 @@ const ProfileSchema = z
       .describe("Maximum number of characters to include when returning post content (set via --max-read-length)"),
     transport: z.enum(["stdio", "http"]).optional().default("stdio").describe("Transport type: stdio (default) or http"),
     port: z.number().int().positive().optional().default(3000).describe("Port to listen on when using HTTP transport"),
+    use_cloudscraper: z.boolean().optional().default(false).describe("Use Python cloudscraper to bypass Cloudflare (requires Python and cloudscraper package)"),
+    python_path: z.string().optional().default("python3").describe("Path to Python executable for cloudscraper"),
   })
   .strict();
 
@@ -95,6 +98,14 @@ function coerceValue(val: string): unknown {
   if (val === "false") return false;
   const num = Number(val);
   if (!Number.isNaN(num) && val.trim() !== "") return num;
+  // Try to parse as JSON for arrays and objects
+  if (val.startsWith("[") || val.startsWith("{")) {
+    try {
+      return JSON.parse(val);
+    } catch {
+      // If JSON parsing fails, return as string
+    }
+  }
   return val;
 }
 
@@ -122,6 +133,8 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
     max_read_length: (((flags.max_read_length ?? flags["max-read-length"]) as number | undefined) ?? profile.max_read_length ?? 50000) as number,
     transport: ((flags.transport as "stdio" | "http" | undefined) ?? profile.transport ?? "stdio") as "stdio" | "http",
     port: ((flags.port as number | undefined) ?? profile.port ?? 3000) as number,
+    use_cloudscraper: (((flags.use_cloudscraper ?? flags["use-cloudscraper"]) as boolean | undefined) ?? profile.use_cloudscraper ?? false) as boolean,
+    python_path: (((flags.python_path ?? flags["python-path"]) as string | undefined) ?? profile.python_path ?? "python3") as string,
   } satisfies Profile;
   const result = ProfileSchema.safeParse(merged);
   if (!result.success) throw new Error(`Invalid configuration: ${result.error.message}`);
@@ -189,6 +202,8 @@ async function main() {
     timeoutMs: config.timeout_ms,
     defaultAuth: auth,
     authOverrides,
+    useCloudscraper: config.use_cloudscraper,
+    pythonPath: config.python_path,
   });
 
   const server = new McpServer(
