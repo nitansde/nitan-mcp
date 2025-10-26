@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
+import { formatTimestamp } from "../../util/timestamp.js";
 
 export const registerReadTopic: RegisterFn = (server, ctx) => {
   const schema = z.object({
@@ -70,7 +71,7 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
               fetchedPosts.push({
                 number: p.post_number,
                 username: p.username,
-                created_at: p.created_at,
+                created_at: formatTimestamp(p.created_at || ""),
                 content: (p.raw || p.cooked || p.excerpt || "").toString().slice(0, limit),
               });
             }
@@ -119,7 +120,7 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
               
               if (headerMatch) {
                 const username = headerMatch[1].trim();
-                const timestamp = headerMatch[2].trim();
+                const timestamp = formatTimestamp(headerMatch[2].trim());
                 const postNumber = parseInt(headerMatch[3], 10);
                 
                 // Skip posts before start_post_number
