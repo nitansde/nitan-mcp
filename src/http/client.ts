@@ -1,4 +1,5 @@
 import { Logger } from "../util/logger.js";
+import { CloudscraperClient } from "./cloudscraper.js";
 
 export type AuthMode =
   | { type: "none" }
@@ -10,6 +11,9 @@ export interface HttpClientOptions {
   timeoutMs: number;
   logger: Logger;
   auth: AuthMode;
+  initialCookies?: string; // Cookie string in format "name1=value1; name2=value2"
+  useCloudscraper?: boolean; // Use Python cloudscraper to bypass Cloudflare
+  pythonPath?: string; // Path to Python executable (default: "python3")
 }
 
 export class HttpError extends Error {
@@ -21,18 +25,58 @@ export class HttpError extends Error {
 
 export class HttpClient {
   private base: URL;
-  private userAgent = "Discourse-MCP/0.x (+https://github.com/discourse-mcp)";
+  // Mimics Microsoft Edge browser on Windows to avoid bot detection
+  private userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0";
   private cache = new Map<string, { value: any; expiresAt: number }>();
+  private cookies = new Map<string, string>(); // Store cookies across requests
+  private lastUrl: string | null = null; // Track last URL for Referer header
+  private cloudscraperClient?: CloudscraperClient;
 
   constructor(private opts: HttpClientOptions) {
     this.base = new URL(opts.baseUrl);
+    // Load initial cookies if provided
+    if (opts.initialCookies) {
+      this.loadCookies(opts.initialCookies);
+    }
+    // Initialize cloudscraper if enabled
+    if (opts.useCloudscraper) {
+      this.cloudscraperClient = new CloudscraperClient(opts.logger, opts.pythonPath);
+      this.opts.logger.info("Cloudscraper enabled for bypassing Cloudflare");
+    }
   }
 
   private headers(): Record<string, string> {
     const h: Record<string, string> = {
+      "Accept": "application/json, text/javascript, */*; q=0.01",
+      "Accept-Encoding": "gzip, deflate, br, zstd",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      "Dnt": "1",
+      "Pragma": "no-cache",
+      "Priority": "u=1, i",
+      "Sec-Ch-Ua": '"Microsoft Edge";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
+      "Sec-Ch-Ua-Mobile": "?0",
+      "Sec-Ch-Ua-Platform": '"Windows"',
+      "Sec-Fetch-Dest": "empty",
+      "Sec-Fetch-Mode": "cors",
+      "Sec-Fetch-Site": "same-origin",
       "User-Agent": this.userAgent,
-      "Accept": "application/json",
+      "X-Requested-With": "XMLHttpRequest",
     };
+    
+    // Add Referer header for subsequent requests
+    if (this.lastUrl) {
+      h["Referer"] = "https://www.uscardforum.com/";
+    }
+    
+    // Add cookies if we have any
+    if (this.cookies.size > 0) {
+      h["Cookie"] = Array.from(this.cookies.entries())
+        .map(([key, value]) => `${key}=${value}`)
+        .join("; ");
+      this.opts.logger.debug(`Using ${this.cookies.size} cookies in request`);
+    }
+    
     if (this.opts.auth.type === "api_key") {
       h["Api-Key"] = this.opts.auth.key;
       if (this.opts.auth.username) h["Api-Username"] = this.opts.auth.username;
@@ -41,6 +85,34 @@ export class HttpClient {
       if (this.opts.auth.client_id) h["User-Api-Client-Id"] = this.opts.auth.client_id;
     }
     return h;
+  }
+
+  private loadCookies(cookieString: string) {
+    // Parse cookie string in format "name1=value1; name2=value2"
+    const pairs = cookieString.split(";");
+    for (const pair of pairs) {
+      const [name, ...valueParts] = pair.split("=");
+      if (name && valueParts.length > 0) {
+        const value = valueParts.join("=");
+        this.cookies.set(name.trim(), value.trim());
+        this.opts.logger.debug(`Loaded initial cookie: ${name.trim()}`);
+      }
+    }
+  }
+
+  private parseCookies(setCookieHeader: string) {
+    // Parse Set-Cookie header and store cookies
+    // Handle multiple Set-Cookie headers (split by comma, but be careful with expires dates)
+    const cookies = setCookieHeader.split(/,(?=[^ ])/);
+    for (const cookie of cookies) {
+      const parts = cookie.split(";")[0].trim(); // Get only the name=value part
+      const [name, ...valueParts] = parts.split("=");
+      if (name && valueParts.length > 0) {
+        const value = valueParts.join("=");
+        this.cookies.set(name.trim(), value.trim());
+        this.opts.logger.debug(`Stored cookie: ${name.trim()}`);
+      }
+    }
   }
 
   async get(path: string, { signal }: { signal?: AbortSignal } = {}) {
@@ -69,6 +141,19 @@ export class HttpClient {
     }
 
     this.opts.logger.debug(`HTTP ${method} ${url}`);
+    
+    // Log request headers for debugging
+    this.opts.logger.debug(`Request headers: ${JSON.stringify(headers, null, 2)}`);
+    
+    // Log request body if present
+    if (body !== undefined) {
+      this.opts.logger.debug(`Request body: ${JSON.stringify(body, null, 2)}`);
+    }
+
+    // Use cloudscraper if enabled
+    if (this.cloudscraperClient) {
+      return this.requestViaCloudscraper(method, url, headers, body);
+    }
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.opts.timeoutMs);
@@ -84,6 +169,23 @@ export class HttpClient {
         });
 
         this.opts.logger.debug(`HTTP ${method} ${url} -> ${res.status} ${res.statusText}`);
+        
+        // Log response headers for debugging
+        const responseHeaders: Record<string, string> = {};
+        res.headers.forEach((value, key) => {
+          responseHeaders[key] = value;
+        });
+        this.opts.logger.debug(`Response headers: ${JSON.stringify(responseHeaders, null, 2)}`);
+        
+        // Store cookies from response
+        const setCookie = res.headers.get("set-cookie");
+        if (setCookie) {
+          this.parseCookies(setCookie);
+          this.opts.logger.debug(`Received Set-Cookie header: ${setCookie}`);
+        }
+        
+        // Update last URL for Referer header
+        this.lastUrl = url;
 
         if (!res.ok) {
           const text = await safeText(res);
@@ -136,6 +238,70 @@ export class HttpClient {
       return await withRetries(attempt, this.opts.logger, url, method);
     } finally {
       clearTimeout(timeout);
+    }
+  }
+
+  private async requestViaCloudscraper(method: string, url: string, headers: Record<string, string>, body?: unknown): Promise<any> {
+    if (!this.cloudscraperClient) {
+      throw new Error("Cloudscraper not initialized");
+    }
+
+    this.opts.logger.debug(`Using cloudscraper for ${method} ${url}`);
+
+    // Convert cookies Map to object
+    const cookiesObj: Record<string, string> = {};
+    this.cookies.forEach((value, key) => {
+      cookiesObj[key] = value;
+    });
+
+    try {
+      const result = await this.cloudscraperClient.request({
+        url,
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+        cookies: cookiesObj,
+        timeout: Math.floor(this.opts.timeoutMs / 1000), // Convert to seconds
+      });
+
+      if (!result.success) {
+        throw new Error(`Cloudscraper error: ${result.error} (${result.error_type})`);
+      }
+
+      this.opts.logger.debug(`Cloudscraper ${method} ${url} -> ${result.status}`);
+
+      // Store cookies from response
+      if (result.cookies) {
+        Object.entries(result.cookies).forEach(([key, value]) => {
+          this.cookies.set(key, value);
+          this.opts.logger.debug(`Stored cookie from cloudscraper: ${key}`);
+        });
+      }
+
+      // Update last URL for Referer header
+      this.lastUrl = url;
+
+      // Check for HTTP errors
+      if (result.status && result.status >= 400) {
+        const errorBody = safeJson(result.body || "");
+        this.opts.logger.error(`HTTP ${result.status} for ${method} ${url}: ${result.body}`);
+        throw new HttpError(result.status, `HTTP ${result.status}`, errorBody);
+      }
+
+      // Parse response body
+      const contentType = result.headers?.["content-type"] || result.headers?.["Content-Type"] || "";
+      if (contentType.includes("application/json")) {
+        return JSON.parse(result.body || "{}");
+      } else {
+        return result.body;
+      }
+    } catch (e: any) {
+      if (e instanceof HttpError) {
+        throw e;
+      }
+      const errorMsg = `Cloudscraper request failed: ${e.message}`;
+      this.opts.logger.error(errorMsg);
+      throw new Error(errorMsg);
     }
   }
 }

@@ -57,6 +57,14 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   - **None** by default.
   - **Admin API Keys** (require admin permissions): **`--auth_pairs '[{"site":"https://example.com","api_key":"...","api_username":"system"}]'`**
   - **User API Keys** (any user can generate): **`--auth_pairs '[{"site":"https://example.com","user_api_key":"...","user_api_client_id":"..."}]'`**
+  - **Browser Cookies** (for sites with Cloudflare or other bot protection): **`--auth_pairs '[{"site":"https://example.com","cookies":"cf_clearance=..."}]'`**
+    - You can obtain the `cf_clearance` cookie from your browser's Developer Tools (Application/Storage → Cookies)
+    - This is typically the only cookie needed to bypass Cloudflare bot protection
+    - If you need logged-in access, add other cookies separated by semicolons: `"cookies":"cf_clearance=...; _forum_session=..."`
+  - **Cloudscraper** (automatic Cloudflare bypass - requires Python): **`--use_cloudscraper=true`**
+    - Requires Python 3.7+ and `pip3 install cloudscraper`
+    - Automatically solves Cloudflare JavaScript challenges without manual cookie management
+    - See [CLOUDSCRAPER_QUICKSTART.md](CLOUDSCRAPER_QUICKSTART.md) for setup instructions
   - You can include multiple entries in `auth_pairs`; the matching entry is used for the selected site. If both `user_api_key` and `api_key` are provided for the same site, `user_api_key` takes precedence.
 
 - **Write safety**
@@ -81,6 +89,8 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   - `--max-read-length <number>`: Maximum characters returned for post content (default 50000). Applies to `discourse_read_post` and per-post content in `discourse_read_topic`. The tools prefer `raw` content by requesting `include_raw=true`.
   - `--transport <stdio|http>` (default: stdio): Transport type. Use `stdio` for standard input/output (default), or `http` for Streamable HTTP transport (stateless mode with JSON responses).
   - `--port <number>` (default: 3000): Port to listen on when using HTTP transport.
+  - `--use_cloudscraper` (default: false): Enable Python cloudscraper for automatic Cloudflare bypass (requires Python 3.7+ and `pip3 install cloudscraper`).
+  - `--python_path <path>` (default: "python3"): Path to Python executable for cloudscraper.
   - `--cache_dir <path>` (reserved)
   - `--profile <path.json>` (see below)
 
@@ -89,7 +99,8 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
 {
   "auth_pairs": [
     { "site": "https://try.discourse.org", "api_key": "<redacted>", "api_username": "system" },
-    { "site": "https://example.com", "user_api_key": "<user_api_key>", "user_api_client_id": "<client_id>" }
+    { "site": "https://example.com", "user_api_key": "<user_api_key>", "user_api_client_id": "<client_id>" },
+    { "site": "https://cloudflare-protected.com", "cookies": "cf_clearance=xxx; __cfduid=yyy" }
   ],
   "read_only": false,
   "allow_writes": true,
@@ -99,7 +110,9 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   "default_search": "tag:ai order:latest-post",
   "max_read_length": 50000,
   "transport": "stdio",
-  "port": 3000
+  "port": 3000,
+  "use_cloudscraper": false,
+  "python_path": "python3"
 }
 ```
 Run with:
