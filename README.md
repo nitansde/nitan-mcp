@@ -4,6 +4,25 @@ This is a modified version of Discourse MCP. It will be a dedicated MCP client f
 
 ### Quick Installation
 
+**Prerequisites:**
+- **Node.js 18 or higher** (required)
+- Python 3.7+ (required for Cloudflare bypass)
+- pip3 (for automatic Python dependency installation)
+
+**Check your Node.js version:**
+```bash
+node --version  # Should be v18.0.0 or higher
+```
+
+**If you need to upgrade Node.js:**
+```bash
+# Using nvm (recommended)
+nvm install 18
+nvm use 18
+
+# Or download from https://nodejs.org/
+```
+
 **Using npx (recommended):**
 ```bash
 npx -y @nitan/mcp@latest

@@ -1,4 +1,17 @@
 #!/usr/bin/env node
+
+// Check Node.js version before anything else
+const nodeVersion = process.versions.node;
+const majorVersion = parseInt(nodeVersion.split('.')[0], 10);
+
+if (majorVersion < 18) {
+  console.error(`Error: Node.js 18 or higher is required. You are using Node.js ${nodeVersion}.`);
+  console.error(`Please upgrade Node.js:`);
+  console.error(`  - Download from https://nodejs.org/`);
+  console.error(`  - Or use nvm: nvm install 18 && nvm use 18`);
+  process.exit(1);
+}
+
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -104,9 +117,11 @@ function coerceValue(val: string): unknown {
   // Try to parse as JSON for arrays and objects
   if (val.startsWith("[") || val.startsWith("{")) {
     try {
-      return JSON.parse(val);
-    } catch {
+      const parsed = JSON.parse(val);
+      return parsed;
+    } catch (e) {
       // If JSON parsing fails, return as string
+      console.error(`Failed to parse JSON value: ${val}`, e);
     }
   }
   return val;
@@ -122,8 +137,45 @@ async function loadProfile(path?: string): Promise<Partial<Profile>> {
 }
 
 function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>): Profile {
+  // Handle simple username/password flags by creating auth_pairs entry
+  let authPairs = (flags.auth_pairs as any) ?? profile.auth_pairs;
+  
+  // If username/password are provided via flags, create an auth_pairs entry
+  const username = (flags.username as string | undefined);
+  const password = (flags.password as string | undefined);
+  const site = (flags.site as string | undefined) ?? profile.site;
+  
+  if (username && password && site) {
+    const authEntry: AuthOverride = {
+      site,
+      username,
+      password,
+    };
+    
+    // Add second_factor_token if provided
+    const secondFactor = (flags.second_factor_token ?? flags["second-factor-token"]) as string | undefined;
+    if (secondFactor) {
+      authEntry.second_factor_token = secondFactor;
+    }
+    
+    // If auth_pairs doesn't exist, create it; otherwise append to it
+    if (!authPairs) {
+      authPairs = [authEntry];
+    } else if (Array.isArray(authPairs)) {
+      // Check if there's already an entry for this site
+      const existingIndex = authPairs.findIndex((entry: any) => entry.site === site);
+      if (existingIndex >= 0) {
+        // Replace existing entry
+        authPairs[existingIndex] = { ...authPairs[existingIndex], ...authEntry };
+      } else {
+        // Add new entry
+        authPairs.push(authEntry);
+      }
+    }
+  }
+  
   const merged = {
-    auth_pairs: (flags.auth_pairs as any) ?? profile.auth_pairs,
+    auth_pairs: authPairs,
     read_only: ((flags.read_only ?? flags["read-only"]) as boolean | undefined) ?? profile.read_only ?? true,
     allow_writes: ((flags.allow_writes ?? flags["allow-writes"]) as boolean | undefined) ?? profile.allow_writes ?? false,
     timeout_ms: ((flags.timeout_ms ?? flags["timeout-ms"]) as number | undefined) ?? profile.timeout_ms ?? DEFAULT_TIMEOUT_MS,
@@ -131,7 +183,7 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
     cache_dir: ((flags.cache_dir ?? flags["cache-dir"]) as string | undefined) ?? profile.cache_dir,
     log_level: (((flags.log_level ?? flags["log-level"]) as LogLevel | undefined) ?? (profile.log_level as LogLevel | undefined) ?? "info") as LogLevel,
     tools_mode: (((flags.tools_mode ?? flags["tools-mode"]) as ToolsMode | undefined) ?? (profile.tools_mode as ToolsMode | undefined) ?? "auto") as ToolsMode,
-    site: (flags.site as string | undefined) ?? profile.site,
+    site: site,
     default_search: (((flags.default_search ?? flags["default-search"]) as string | undefined) ?? profile.default_search) as string | undefined,
     max_read_length: (((flags.max_read_length ?? flags["max-read-length"]) as number | undefined) ?? profile.max_read_length ?? 50000) as number,
     transport: ((flags.transport as "stdio" | "http" | undefined) ?? profile.transport ?? "stdio") as "stdio" | "http",
@@ -139,8 +191,9 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
     use_cloudscraper: (((flags.use_cloudscraper ?? flags["use-cloudscraper"]) as boolean | undefined) ?? profile.use_cloudscraper ?? false) as boolean,
     python_path: (((flags.python_path ?? flags["python-path"]) as string | undefined) ?? profile.python_path ?? "python3") as string,
   } satisfies Profile;
+  
   const result = ProfileSchema.safeParse(merged);
-  if (!result.success) throw new Error(`Invalid configuration: ${result.error.message}`);
+  if (!result.success) throw new Error(`Invalid configuration: ${JSON.stringify(result.error.issues, null, 2)}`);
   return result.data;
 }
 
@@ -248,7 +301,8 @@ async function main() {
   });
 
   // If tethered and remote tool discovery is enabled, discover now
-  if (config.site && config.tools_mode !== "discourse_api_only") {
+  // Skip for uscardforum.com as it doesn't have AI tools endpoint
+  if (config.site && config.tools_mode !== "discourse_api_only" && !config.site.includes("uscardforum.com")) {
     await tryRegisterRemoteTools(server as any, siteState, logger);
   }
 

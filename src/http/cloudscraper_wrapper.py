@@ -10,6 +10,14 @@ import json
 import cloudscraper
 from typing import Dict, Optional
 
+# Try to import brotli for decompression support
+try:
+    import brotli
+    HAS_BROTLI = True
+except ImportError:
+    HAS_BROTLI = False
+    print("[WARNING] brotli module not found. Install with: pip3 install brotli", file=sys.stderr)
+
 # Global scraper instance to maintain session across requests
 _scraper_instance: Optional[cloudscraper.CloudScraper] = None
 _base_url: Optional[str] = None
@@ -208,12 +216,51 @@ def make_request(data: Dict) -> Dict:
         # Get CSRF token if available
         csrf_token = scraper.headers.get('X-CSRF-Token')
         
+        # Ensure body is properly decoded as text
+        # The requests library should auto-decode gzip, but let's ensure it
+        try:
+            content_encoding = response.headers.get('Content-Encoding', '').lower()
+            
+            # If brotli compressed and we have the library, decompress manually
+            if content_encoding == 'br' and HAS_BROTLI:
+                print(f"[DEBUG] Manually decompressing Brotli content", file=sys.stderr)
+                decompressed = brotli.decompress(response.content)
+                body_text = decompressed.decode('utf-8', errors='replace')
+            else:
+                # Force encoding detection if not set
+                if response.encoding is None or response.encoding == 'ISO-8859-1':
+                    # Try to detect from content-type or default to utf-8
+                    response.encoding = response.apparent_encoding or 'utf-8'
+                
+                # Get the text content - this should handle gzip automatically
+                body_text = response.text
+            
+            # Verify it's actually decoded
+            print(f"[DEBUG] Response encoding: {response.encoding}", file=sys.stderr)
+            print(f"[DEBUG] Content-Encoding header: {response.headers.get('Content-Encoding', 'none')}", file=sys.stderr)
+            print(f"[DEBUG] Response body length: {len(body_text)} chars", file=sys.stderr)
+            print(f"[DEBUG] Response body preview (first 200 chars): {body_text[:200]}", file=sys.stderr)
+            
+            # Check if body looks like JSON
+            if body_text.strip().startswith('{') or body_text.strip().startswith('['):
+                print(f"[DEBUG] Body appears to be JSON", file=sys.stderr)
+            else:
+                print(f"[DEBUG] WARNING: Body does not appear to be JSON!", file=sys.stderr)
+                print(f"[DEBUG] First bytes as hex: {body_text[:50].encode('latin1', errors='ignore').hex()}", file=sys.stderr)
+                
+        except Exception as e:
+            print(f"[DEBUG] Failed to decode response body: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            # Fallback: try to decode as utf-8
+            body_text = response.content.decode('utf-8', errors='replace')
+        
         # Return response data
         return {
             'success': True,
             'status': response.status_code,
             'headers': dict(response.headers),
-            'body': response.text,
+            'body': body_text,
             'cookies': cookies,
             'csrf_token': csrf_token,
             'logged_in': should_login  # Indicate if we just logged in
@@ -235,8 +282,10 @@ def main():
         # Make the request
         result = make_request(input_data)
         
-        # Write result to stdout
-        print(json.dumps(result))
+        # Write result to stdout with explicit encoding
+        output = json.dumps(result, ensure_ascii=True)
+        sys.stdout.write(output)
+        sys.stdout.flush()
         sys.exit(0)
         
     except json.JSONDecodeError as e:
@@ -245,7 +294,9 @@ def main():
             'error': f'Invalid JSON input: {str(e)}',
             'error_type': 'JSONDecodeError'
         }
-        print(json.dumps(error_result))
+        output = json.dumps(error_result, ensure_ascii=True)
+        sys.stdout.write(output)
+        sys.stdout.flush()
         sys.exit(1)
         
     except Exception as e:
@@ -254,7 +305,9 @@ def main():
             'error': str(e),
             'error_type': type(e).__name__
         }
-        print(json.dumps(error_result))
+        output = json.dumps(error_result, ensure_ascii=True)
+        sys.stdout.write(output)
+        sys.stdout.flush()
         sys.exit(1)
 
 if __name__ == '__main__':

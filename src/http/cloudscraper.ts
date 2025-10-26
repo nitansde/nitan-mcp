@@ -84,17 +84,31 @@ export class CloudscraperClient {
       let stdout = "";
       let stderr = "";
 
+      python.stdout.setEncoding('utf8');
+      python.stderr.setEncoding('utf8');
+
       python.stdout.on("data", (data) => {
-        stdout += data.toString();
+        stdout += data;
       });
 
       python.stderr.on("data", (data) => {
-        stderr += data.toString();
+        stderr += data;
       });
 
       python.on("close", (code) => {
         if (stderr) {
           this.logger.debug(`Python stderr: ${stderr}`);
+        }
+
+        this.logger.debug(`Python process exited with code: ${code}`);
+        this.logger.debug(`Raw stdout length: ${stdout.length} bytes`);
+        this.logger.debug(`Raw stdout (first 500 chars): ${stdout.substring(0, 500)}`);
+        
+        // Check for binary data
+        const hasBinaryData = /[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\xFF]/.test(stdout);
+        if (hasBinaryData) {
+          this.logger.error(`Stdout contains binary data! This may indicate gzip or other encoding issue.`);
+          this.logger.debug(`Stdout as hex (first 100 bytes): ${Buffer.from(stdout.substring(0, 100)).toString('hex')}`);
         }
 
         try {
@@ -108,7 +122,8 @@ export class CloudscraperClient {
         } catch (e) {
           const error = e as Error;
           this.logger.error(`Failed to parse cloudscraper response: ${error.message}`);
-          this.logger.debug(`Raw output: ${stdout}`);
+          this.logger.error(`Raw output length: ${stdout.length}`);
+          this.logger.error(`Raw output (full): ${stdout}`);
           reject(new Error(`Cloudscraper failed: ${error.message}`));
         }
       });
