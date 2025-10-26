@@ -29,6 +29,7 @@ export const registerListNotifications: RegisterFn = (server, ctx) => {
     async ({ limit = 30, unread_only = true }, _extra: any) => {
       try {
         const { base, client } = ctx.siteState.ensureSelectedSite();
+        const maxReadLength = Number.isFinite(ctx.maxReadLength) ? ctx.maxReadLength : 50000;
         
         // Fetch notifications from the API
         const url = `/notifications.json?limit=${limit}&recent=true&bump_last_seen_reviewable=true`;
@@ -50,6 +51,20 @@ export const registerListNotifications: RegisterFn = (server, ctx) => {
               },
             ],
           };
+        }
+        
+        // Fetch content for "replied" notifications (type 2)
+        const contentMap = new Map<string, string>();
+        for (const notif of notifications) {
+          if (notif.notification_type === 2 && notif.topic_id && notif.post_number) {
+            try {
+              const rawContent = (await client.get(`/raw/${notif.topic_id}/${notif.post_number}`)) as string;
+              const key = `${notif.topic_id}/${notif.post_number}`;
+              contentMap.set(key, rawContent.slice(0, maxReadLength));
+            } catch (e) {
+              // If fetching content fails, just skip it
+            }
+          }
         }
         
         // Map notification types to readable labels
@@ -100,48 +115,20 @@ export const registerListNotifications: RegisterFn = (server, ctx) => {
             lines.push(`   Badge: ${notif.data.badge_name}`);
           }
           
+          // Add content for "replied" notifications
+          if (notif.notification_type === 2 && notif.topic_id && notif.post_number) {
+            const key = `${notif.topic_id}/${notif.post_number}`;
+            const content = contentMap.get(key);
+            if (content) {
+              lines.push(`   Content: ${content}`);
+            }
+          }
+          
           lines.push("");
           i++;
         }
         
-        // Build a compact JSON footer for structured extraction
-        const jsonFooter = {
-          count: notifications.length,
-          unread_only,
-          seen_notification_id: data?.seen_notification_id,
-          results: notifications.map((notif) => {
-            const result: any = {
-              id: notif.id,
-              type: notif.notification_type,
-              type_label: notificationTypeLabels[notif.notification_type] || `type_${notif.notification_type}`,
-              read: notif.read,
-              high_priority: notif.high_priority,
-              created_at: notif.created_at,
-              title: notif.fancy_title || notif.data?.topic_title,
-              username: notif.data?.display_username || notif.data?.original_username,
-            };
-            
-            if (notif.topic_id && notif.slug) {
-              result.topic_id = notif.topic_id;
-              result.post_number = notif.post_number;
-              result.url = `${base}/t/${notif.slug}/${notif.topic_id}${notif.post_number ? `/${notif.post_number}` : ""}`;
-            }
-            
-            if (notif.notification_type === 12 && notif.data?.badge_name) {
-              result.badge_name = notif.data.badge_name;
-            }
-            
-            return result;
-          }),
-        };
-        
-        const text =
-          lines.join("\n") +
-          "\n```json\n" +
-          JSON.stringify(jsonFooter, null, 2) +
-          "\n```\n";
-        
-        return { content: [{ type: "text", text }] };
+        return { content: [{ type: "text", text: lines.join("\n") }] };
       } catch (e: any) {
         return {
           content: [
