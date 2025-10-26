@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
 import { formatTimestamp } from "../../util/timestamp.js";
+import { getCategoryName } from "../categories.js";
 
 export const registerListUserPosts: RegisterFn = (server, ctx) => {
   const schema = z.object({
@@ -47,6 +48,7 @@ export const registerListUserPosts: RegisterFn = (server, ctx) => {
           const topicId = action.topic_id || "";
           const postNumber = action.post_number || "";
           const categoryId = action.category_id || "";
+          const categoryName = categoryId ? getCategoryName(categoryId) : "";
 
           const postUrl = `${base}/t/${topicSlug}/${topicId}/${postNumber}`;
 
@@ -54,7 +56,7 @@ export const registerListUserPosts: RegisterFn = (server, ctx) => {
             `**${topicTitle}**`,
             `Posted: ${date}`,
             `Topic: ${postUrl}`,
-            categoryId ? `Category ID: ${categoryId}` : undefined,
+            categoryName ? `Category: ${categoryName}` : undefined,
             excerpt ? `\n${excerpt}${truncated}` : undefined,
           ].filter(Boolean).join("\n");
         });
