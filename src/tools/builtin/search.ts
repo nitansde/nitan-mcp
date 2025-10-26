@@ -4,7 +4,6 @@ import type { RegisterFn } from "../types.js";
 export const registerSearch: RegisterFn = (server, ctx) => {
   const schema = z.object({
     query: z.string().min(1).describe("Search query"),
-    with_private: z.boolean().optional(),
     max_results: z.number().int().min(1).max(50).optional(),
   });
 
@@ -16,7 +15,7 @@ export const registerSearch: RegisterFn = (server, ctx) => {
       inputSchema: schema.shape,
     },
     async (args, _extra: any) => {
-      const { query, with_private = false, max_results = 10 } = args;
+      const { query, max_results = 10 } = args;
       const { base, client } = ctx.siteState.ensureSelectedSite();
       const q = new URLSearchParams();
       q.set("expanded", "true");
@@ -27,26 +26,34 @@ export const registerSearch: RegisterFn = (server, ctx) => {
         const topics: any[] = data?.topics || [];
         const posts: any[] = data?.posts || [];
 
+        // Create a map of topic_id to blurb from posts
+        const topicBlurbMap = new Map<number, string>();
+        for (const post of posts) {
+          if (post.topic_id && post.blurb && !topicBlurbMap.has(post.topic_id)) {
+            topicBlurbMap.set(post.topic_id, post.blurb);
+          }
+        }
+
         const items = (topics.map((t) => ({
           type: "topic" as const,
           id: t.id,
           title: t.title,
           slug: t.slug,
-        })) as Array<{ type: "topic"; id: number; title: string; slug: string }>).slice(0, max_results);
+          blurb: topicBlurbMap.get(t.id),
+        })) as Array<{ type: "topic"; id: number; title: string; slug: string; blurb?: string }>).slice(0, max_results);
 
-        const lines: string[] = [];
-        lines.push(`Top results for "${query}":`);
-        let idx = 1;
-        for (const it of items) {
-          const url = `${base}/t/${it.slug}/${it.id}`;
-          lines.push(`${idx}. ${it.title} – ${url}`);
-          idx++;
-        }
-
-        const jsonFooter = {
-          results: items.map((it) => ({ id: it.id, url: `${base}/t/${it.slug}/${it.id}`, title: it.title })),
-        };
-        const text = lines.join("\n") + "\n\n```json\n" + JSON.stringify(jsonFooter) + "\n```\n";
+        const jsonOutput = items.map((it) => {
+          const result: any = { 
+            id: it.id, 
+            url: `${base}/t/${it.slug}/${it.id}`, 
+            title: it.title 
+          };
+          if (it.blurb) {
+            result.blurb = it.blurb;
+          }
+          return result;
+        });
+        const text = "```json\n" + JSON.stringify(jsonOutput, null, 2) + "\n```\n";
         return { content: [{ type: "text", text }] };
       } catch (e: any) {
         return { content: [{ type: "text", text: `Search failed: ${e?.message || String(e)}` }], isError: true };
