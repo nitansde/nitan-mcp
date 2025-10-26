@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
+import { formatTimestamp } from "../../util/timestamp.js";
 
 export const registerListNotifications: RegisterFn = (server, ctx) => {
   const schema = z
@@ -81,8 +82,7 @@ export const registerListNotifications: RegisterFn = (server, ctx) => {
           const isHighPriority = notif.high_priority ? " [HIGH PRIORITY]" : "";
           
           // Format timestamp
-          const createdAt = new Date(notif.created_at);
-          const timeStr = createdAt.toLocaleString();
+          const timeStr = formatTimestamp(notif.created_at);
           
           lines.push(`${i}. [${type}] ${title}${isHighPriority}`);
           lines.push(`   From: ${username}`);

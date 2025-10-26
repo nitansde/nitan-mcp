@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
+import { formatTimestamp } from "../../util/timestamp.js";
 
 export const registerGetUser: RegisterFn = (server, ctx) => {
   const schema = z.object({
@@ -20,7 +21,7 @@ export const registerGetUser: RegisterFn = (server, ctx) => {
         const user = data?.user || data?.user_badges || data;
         const name = user?.name || username;
         const trust = user?.trust_level;
-        const created = user?.created_at || user?.user?.created_at || "";
+        const created = formatTimestamp(user?.created_at || user?.user?.created_at || "");
         const bio = user?.bio_raw || "";
         const lines = [
           `@${username} (${name})`,

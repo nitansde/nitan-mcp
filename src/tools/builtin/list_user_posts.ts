@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
+import { formatTimestamp } from "../../util/timestamp.js";
 
 export const registerListUserPosts: RegisterFn = (server, ctx) => {
   const schema = z.object({
@@ -40,7 +41,7 @@ export const registerListUserPosts: RegisterFn = (server, ctx) => {
         const posts = userActions.map((action: any) => {
           const excerpt = action.excerpt || "";
           const truncated = action.truncated ? "..." : "";
-          const date = action.created_at || "";
+          const date = formatTimestamp(action.created_at || "");
           const topicTitle = action.title || "";
           const topicSlug = action.slug || "";
           const topicId = action.topic_id || "";
