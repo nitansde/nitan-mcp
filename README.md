@@ -47,16 +47,42 @@ pip3 install cloudscraper
 
 **For Claude Desktop (macOS):**
 ```json
+### MCP Client Configuration
+
+**Environment Variables (recommended for security):**
+```bash
+export NITAN_USERNAME="your_username"
+export NITAN_PASSWORD="your_password"
+```
+
+**For Claude Desktop (macOS):**
+```json
 {
   "mcpServers": {
     "nitan": {
       "command": "npx",
       "args": [
         "-y",
-        "@nitan/mcp@latest",
-        "--site",
-        "https://www.uscardforum.com/",
-        "--use_cloudscraper",
+        "@nitansde/mcp@latest"
+      ],
+      "env": {
+        "NITAN_USERNAME": "YOUR_USERNAME",
+        "NITAN_PASSWORD": "YOUR_PASSWORD"
+      }
+    }
+  }
+}
+```
+
+**Or with command line arguments:**
+```json
+{
+  "mcpServers": {
+    "nitan": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@nitansde/mcp@latest",
         "--username",
         "YOUR_USERNAME",
         "--password",
@@ -67,6 +93,9 @@ pip3 install cloudscraper
     }
   }
 }
+```
+
+**Configuration file location:**
 ```
 
 **Configuration file location:**

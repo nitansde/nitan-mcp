@@ -67,7 +67,7 @@ const ProfileSchema = z
     cache_dir: z.string().optional(),
     log_level: z.enum(["silent", "error", "info", "debug"]).optional().default("info"),
     tools_mode: z.enum(["auto", "discourse_api_only", "tool_exec_api"]).optional().default("auto"),
-    site: z.string().url().optional().describe("Tether MCP to a single Discourse site; hides select_site and preselects this site"),
+    site: z.string().url().optional().default("https://www.uscardforum.com/").describe("Tether MCP to a single Discourse site; defaults to uscardforum.com"),
     default_search: z.string().optional().describe("Optional search prefix added to every search query (set via --default-search)"),
     max_read_length: z
       .number()
@@ -78,7 +78,7 @@ const ProfileSchema = z
       .describe("Maximum number of characters to include when returning post content (set via --max-read-length)"),
     transport: z.enum(["stdio", "http"]).optional().default("stdio").describe("Transport type: stdio (default) or http"),
     port: z.number().int().positive().optional().default(3000).describe("Port to listen on when using HTTP transport"),
-    use_cloudscraper: z.boolean().optional().default(false).describe("Use Python cloudscraper to bypass Cloudflare (requires Python and cloudscraper package)"),
+    use_cloudscraper: z.boolean().optional().default(true).describe("Use Python cloudscraper to bypass Cloudflare (enabled by default)"),
     python_path: z.string().optional().default("python3").describe("Path to Python executable for cloudscraper"),
   })
   .strict();
@@ -140,20 +140,20 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
   // Handle simple username/password flags by creating auth_pairs entry
   let authPairs = (flags.auth_pairs as any) ?? profile.auth_pairs;
   
-  // If username/password are provided via flags, create an auth_pairs entry
-  const username = (flags.username as string | undefined);
-  const password = (flags.password as string | undefined);
-  const site = (flags.site as string | undefined) ?? profile.site;
+  // If username/password are provided via flags or environment variables, create an auth_pairs entry
+  const username = (flags.username as string | undefined) ?? process.env.NITAN_USERNAME;
+  const password = (flags.password as string | undefined) ?? process.env.NITAN_PASSWORD;
+  const site = (flags.site as string | undefined) ?? profile.site ?? "https://www.uscardforum.com/";
   
   if (username && password && site) {
     const authEntry: AuthOverride = {
       site,
       username,
       password,
-    };
+    }
     
     // Add second_factor_token if provided
-    const secondFactor = (flags.second_factor_token ?? flags["second-factor-token"]) as string | undefined;
+    const secondFactor = (flags.second_factor_token ?? flags["second-factor-token"]) as string | undefined ?? process.env.DISCOURSE_2FA_TOKEN;
     if (secondFactor) {
       authEntry.second_factor_token = secondFactor;
     }
@@ -183,12 +183,12 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
     cache_dir: ((flags.cache_dir ?? flags["cache-dir"]) as string | undefined) ?? profile.cache_dir,
     log_level: (((flags.log_level ?? flags["log-level"]) as LogLevel | undefined) ?? (profile.log_level as LogLevel | undefined) ?? "info") as LogLevel,
     tools_mode: (((flags.tools_mode ?? flags["tools-mode"]) as ToolsMode | undefined) ?? (profile.tools_mode as ToolsMode | undefined) ?? "auto") as ToolsMode,
-    site: site,
+    site: site ?? "https://www.uscardforum.com/",
     default_search: (((flags.default_search ?? flags["default-search"]) as string | undefined) ?? profile.default_search) as string | undefined,
     max_read_length: (((flags.max_read_length ?? flags["max-read-length"]) as number | undefined) ?? profile.max_read_length ?? 50000) as number,
     transport: ((flags.transport as "stdio" | "http" | undefined) ?? profile.transport ?? "stdio") as "stdio" | "http",
     port: ((flags.port as number | undefined) ?? profile.port ?? 3000) as number,
-    use_cloudscraper: (((flags.use_cloudscraper ?? flags["use-cloudscraper"]) as boolean | undefined) ?? profile.use_cloudscraper ?? false) as boolean,
+    use_cloudscraper: (((flags.use_cloudscraper ?? flags["use-cloudscraper"]) as boolean | undefined) ?? profile.use_cloudscraper ?? true) as boolean,
     python_path: (((flags.python_path ?? flags["python-path"]) as string | undefined) ?? profile.python_path ?? "python3") as string,
   } satisfies Profile;
   
