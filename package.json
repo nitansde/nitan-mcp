@@ -1,16 +1,18 @@
 {
-  "name": "@discourse/mcp",
-  "version": "0.1.9",
-  "description": "Discourse MCP CLI server (stdio) exposing Discourse tools via MCP",
+  "name": "@nitan/mcp",
+  "version": "1.0.0",
+  "description": "Nitan MCP CLI server for uscardforum.com (modified Discourse MCP with Cloudflare bypass)",
   "private": false,
   "type": "module",
   "bin": {
-    "discourse-mcp": "dist/index.js"
+    "nitan-mcp": "dist/index.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && npm run copy:python",
+    "copy:python": "mkdir -p dist/http && cp src/http/cloudscraper_wrapper.py dist/http/ && cp requirements.txt dist/",
+    "postinstall": "node scripts/check-python-deps.mjs",
     "prepublishOnly": "pnpm run build",
     "dev": "node --enable-source-maps dist/index.js",
     "typecheck": "tsc --noEmit",
@@ -24,6 +26,7 @@
   },
   "files": [
     "dist/**",
+    "scripts/check-python-deps.mjs",
     "README.md",
     "LICENSE"
   ],
