@@ -82,37 +82,35 @@ export const registerListNotifications: RegisterFn = (server, ctx) => {
           17: "watching_category_or_tag",
         };
         
-        // Format human-readable output
-        const lines: string[] = [];
-        const filterText = unread_only ? "Unread Notifications" : "Notifications";
-        lines.push(`${filterText} (showing ${notifications.length}${unread_only ? "" : ` of ${data?.notifications?.length || notifications.length} total`}):`);
-        lines.push("");
-        
-        let i = 1;
-        for (const notif of notifications) {
+        // Build JSON output
+        const jsonOutput = notifications.map((notif) => {
           const type = notificationTypeLabels[notif.notification_type] || `type_${notif.notification_type}`;
           const title = notif.fancy_title || notif.data?.topic_title || "Notification";
           const username = notif.data?.display_username || notif.data?.original_username || "Unknown";
-          const readStatus = notif.read ? "✓ Read" : "✉ Unread";
-          const isHighPriority = notif.high_priority ? " [HIGH PRIORITY]" : "";
-          
-          // Format timestamp
           const timeStr = formatTimestamp(notif.created_at);
           
-          lines.push(`${i}. [${type}] ${title}${isHighPriority}`);
-          lines.push(`   From: ${username}`);
-          lines.push(`   Status: ${readStatus}`);
-          lines.push(`   Time: ${timeStr}`);
+          const result: any = {
+            type: type,
+            title: title,
+            from: username,
+            unread: !notif.read,
+            time: timeStr,
+          };
           
           // Add URL if topic exists
           if (notif.topic_id && notif.slug) {
             const url = `${base}/t/${notif.slug}/${notif.topic_id}${notif.post_number ? `/${notif.post_number}` : ""}`;
-            lines.push(`   URL: ${url}`);
+            result.url = url;
+          }
+          
+          // Add high priority flag if applicable
+          if (notif.high_priority) {
+            result.high_priority = true;
           }
           
           // Add badge info if it's a badge notification
           if (notif.notification_type === 12 && notif.data?.badge_name) {
-            lines.push(`   Badge: ${notif.data.badge_name}`);
+            result.badge = notif.data.badge_name;
           }
           
           // Add content for "replied" notifications
@@ -120,15 +118,15 @@ export const registerListNotifications: RegisterFn = (server, ctx) => {
             const key = `${notif.topic_id}/${notif.post_number}`;
             const content = contentMap.get(key);
             if (content) {
-              lines.push(`   Content: ${content}`);
+              result.content = content;
             }
           }
           
-          lines.push("");
-          i++;
-        }
+          return result;
+        });
         
-        return { content: [{ type: "text", text: lines.join("\n") }] };
+        const text = JSON.stringify(jsonOutput, null, 2);
+        return { content: [{ type: "text", text }] };
       } catch (e: any) {
         return {
           content: [

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
 import { getCategoryName } from "../categories.js";
+import { formatTimestamp } from "../../util/timestamp.js";
 
 export const registerListHotTopics: RegisterFn = (server, ctx) => {
   const schema = z
@@ -79,28 +80,20 @@ export const registerListHotTopics: RegisterFn = (server, ctx) => {
           i++;
         }
         
-        // Build a compact JSON footer for structured extraction
-        const jsonFooter = {
-          count: limitedTopics.length,
-          total: topics.length,
-          results: limitedTopics.map((topic) => ({
-            id: topic.id,
-            title: topic.title || topic.fancy_title || `Topic ${topic.id}`,
-            slug: topic.slug || String(topic.id),
-            url: `${base}/t/${topic.slug || topic.id}/${topic.id}`,
-            views: topic.views ?? 0,
-            posts_count: topic.posts_count ?? 0,
-            like_count: topic.like_count ?? 0,
-            category_id: topic.category_id,
-            tags: topic.tags || [],
-          })),
-        };
+        // Build a compact JSON output
+        const jsonOutput = limitedTopics.map((topic) => ({
+          id: topic.id,
+          title: topic.title || topic.fancy_title || `Topic ${topic.id}`,
+          url: `${base}/t/${topic.slug || topic.id}/${topic.id}`,
+          views: topic.views ?? 0,
+          posts_count: topic.posts_count ?? 0,
+          like_count: topic.like_count ?? 0,
+          category: topic.category_id ? (topic.category_name || getCategoryName(topic.category_id)) : undefined,
+          tags: topic.tags || [],
+          created_at: formatTimestamp(topic.created_at || ""),
+        }));
         
-        const text =
-          lines.join("\n") +
-          "\n```json\n" +
-          JSON.stringify(jsonFooter, null, 2) +
-          "\n```\n";
+        const text = JSON.stringify(jsonOutput, null, 2);
         
         return { content: [{ type: "text", text }] };
       } catch (e: any) {
