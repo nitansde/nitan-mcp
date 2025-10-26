@@ -79,7 +79,7 @@ const ProfileSchema = z
     transport: z.enum(["stdio", "http"]).optional().default("stdio").describe("Transport type: stdio (default) or http"),
     port: z.number().int().positive().optional().default(3000).describe("Port to listen on when using HTTP transport"),
     use_cloudscraper: z.boolean().optional().default(true).describe("Use Python cloudscraper to bypass Cloudflare (enabled by default)"),
-    python_path: z.string().optional().default("python3").describe("Path to Python executable for cloudscraper"),
+    python_path: z.string().optional().default(process.platform === "win32" ? "python" : "python3").describe("Path to Python executable for cloudscraper"),
   })
   .strict();
 
@@ -189,7 +189,7 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
     transport: ((flags.transport as "stdio" | "http" | undefined) ?? profile.transport ?? "stdio") as "stdio" | "http",
     port: ((flags.port as number | undefined) ?? profile.port ?? 3000) as number,
     use_cloudscraper: (((flags.use_cloudscraper ?? flags["use-cloudscraper"]) as boolean | undefined) ?? profile.use_cloudscraper ?? true) as boolean,
-    python_path: (((flags.python_path ?? flags["python-path"]) as string | undefined) ?? profile.python_path ?? "python3") as string,
+    python_path: (((flags.python_path ?? flags["python-path"]) as string | undefined) ?? profile.python_path ?? (process.platform === "win32" ? "python" : "python3")) as string,
   } satisfies Profile;
   
   const result = ProfileSchema.safeParse(merged);

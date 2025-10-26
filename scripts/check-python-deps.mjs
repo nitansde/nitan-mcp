@@ -10,23 +10,38 @@ const rootDir = join(__dirname, '..');
 
 console.log('Checking Python dependencies for Discourse MCP...');
 
-// Check if Python is available
+// Check if Python is available (try python3 first, then python for Windows)
+let pythonCmd = 'python3';
 try {
-  const pythonVersion = execSync('python3 --version', { encoding: 'utf-8' }).trim();
+  const pythonVersion = execSync(`${pythonCmd} --version`, { encoding: 'utf-8' }).trim();
   console.log(`Found ${pythonVersion}`);
 } catch (error) {
-  console.warn('Warning: python3 not found. Cloudscraper features will not work.');
-  console.warn('To use cloudscraper, install Python 3.7+ and run: pip3 install -r requirements.txt');
-  process.exit(0); // Don't fail installation
+  // Try 'python' command (common on Windows)
+  try {
+    pythonCmd = 'python';
+    const pythonVersion = execSync(`${pythonCmd} --version`, { encoding: 'utf-8' }).trim();
+    console.log(`Found ${pythonVersion}`);
+  } catch (error2) {
+    console.warn('Warning: Python not found. Cloudscraper features will not work.');
+    console.warn('To use cloudscraper, install Python 3.7+ and run: pip install -r requirements.txt');
+    process.exit(0); // Don't fail installation
+  }
 }
 
-// Check if pip is available
+// Check if pip is available (try pip3 first, then pip for Windows)
+let pipCmd = 'pip3';
 try {
-  execSync('pip3 --version', { encoding: 'utf-8', stdio: 'ignore' });
+  execSync(`${pipCmd} --version`, { encoding: 'utf-8', stdio: 'ignore' });
 } catch (error) {
-  console.warn('Warning: pip3 not found. Cannot install Python dependencies.');
-  console.warn('Install pip3 and run: pip3 install -r requirements.txt');
-  process.exit(0); // Don't fail installation
+  // Try 'pip' command (common on Windows)
+  try {
+    pipCmd = 'pip';
+    execSync(`${pipCmd} --version`, { encoding: 'utf-8', stdio: 'ignore' });
+  } catch (error2) {
+    console.warn('Warning: pip not found. Cannot install Python dependencies.');
+    console.warn('Install pip and run: pip install -r requirements.txt');
+    process.exit(0); // Don't fail installation
+  }
 }
 
 // Try to install Python dependencies
@@ -39,15 +54,15 @@ if (!existsSync(requirementsFile)) {
 if (existsSync(requirementsFile)) {
   try {
     console.log('Installing Python dependencies...');
-    execSync(`pip3 install --quiet -r "${requirementsFile}"`, {
+    execSync(`${pipCmd} install --quiet -r "${requirementsFile}"`, {
       encoding: 'utf-8',
       stdio: 'inherit'
     });
     console.log('Python dependencies installed successfully!');
   } catch (error) {
     console.warn('Warning: Failed to install Python dependencies automatically.');
-    console.warn('You may need to run manually: pip3 install -r requirements.txt');
-    console.warn('Or use a virtual environment: python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt');
+    console.warn(`You may need to run manually: ${pipCmd} install -r requirements.txt`);
+    console.warn(`Or use a virtual environment: ${pythonCmd} -m venv venv && pip install -r requirements.txt`);
     process.exit(0); // Don't fail installation
   }
 } else {
