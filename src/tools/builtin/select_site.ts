@@ -23,7 +23,8 @@ export const registerSelectSite: RegisterFn = (server, ctx, opts) => {
         ctx.siteState.selectSite(base);
 
         // Attempt remote tool discovery if enabled
-        if (opts.toolsMode && opts.toolsMode !== "discourse_api_only") {
+        // Skip for uscardforum.com as it doesn't have AI tools endpoint
+        if (opts.toolsMode && opts.toolsMode !== "discourse_api_only" && !base.includes("uscardforum.com")) {
           await tryRegisterRemoteTools(server, ctx.siteState, ctx.logger);
         }
 

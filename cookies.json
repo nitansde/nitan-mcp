@@ -1,9 +1,0 @@
-{
-  "auth_pairs": [
-    {
-      "site": "https://www.uscardforum.com/",
-      "cookies": "cf_clearance=N8Jijuf5yE7HP1UYCpSta0VFS.fx5mdhyT5smgCm4SE-1761430596-1.2.1.1-.0r7edZK9WbBQZvuJVQ2K9cNHQIAspOYTWbdASbT_.Rrdav0IlBlONsv1XUjJZu.KkKh45uMqxuNx982OP_Zg3PP7mImzEaNSw_d0ff1yotY6EisDcf91SsP5Slz7NGJCgyVkNqBcqsNxGTkEoa5oYasjD.8oeuIsdCEuw..IqHx7OwrCXO7R4ZetQWbvcPgfczrTd77oc.gvyZcxYltmMbF5GIU9bAb5JKK7k2iiYI"
-    }
-  ],
-  "log_level": "debug"
-}
