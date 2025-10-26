@@ -4,8 +4,8 @@ import type { RegisterFn } from "../types.js";
 export const registerReadTopic: RegisterFn = (server, ctx) => {
   const schema = z.object({
     topic_id: z.number().int().positive(),
-    post_limit: z.number().int().min(1).max(100).optional(),
-    start_post_number: z.number().int().min(1).optional().describe("Start from this post number (1-based)")
+    post_limit: z.number().int().min(1).max(500).optional().describe("Number of posts to fetch (default 30, max 500)"),
+    start_post_number: z.number().int().min(1).optional().describe("Start from this post number (default 1, 1-based)")
   });
 
   server.registerTool(
@@ -15,34 +15,49 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
       description: "Read a topic metadata and first N posts.",
       inputSchema: schema.shape,
     },
-    async ({ topic_id, post_limit = 5, start_post_number }, _extra: any) => {
+    async ({ topic_id, post_limit = 30, start_post_number = 1 }, _extra: any) => {
       try {
         const { base, client } = ctx.siteState.ensureSelectedSite();
-        const start = start_post_number ?? 1;
+        const start = start_post_number;
+        const limit = Number.isFinite(ctx.maxReadLength) ? ctx.maxReadLength : 50000;
 
-        // First request to load metadata/title and initial chunk
-        let current = start;
         let fetchedPosts: Array<{ number: number; username: string; created_at: string; content: string }> = [];
         let slug = "";
         let title = `Topic ${topic_id}`;
         let category = "";
         let tags: string[] = [];
-
-        const maxBatches = 10; // safety guard
-        const limit = Number.isFinite(ctx.maxReadLength) ? ctx.maxReadLength : 50000;
-        for (let i = 0; i < maxBatches && fetchedPosts.length < post_limit; i++) {
-          // Ask for raw content when possible
-          const url = current > 1 ? `/t/${topic_id}.json?near=${current}&include_raw=true` : `/t/${topic_id}.json?include_raw=true`;
+        let current = start;
+        let isFirstRequest = true;
+        
+        // Loop until we have enough posts or no more posts available
+        while (fetchedPosts.length < post_limit) {
+          // Use the /t/{topic_id}/{post_number}.json endpoint which returns ~15 posts starting from post_number
+          const url = `/t/${topic_id}/${current}.json?include_raw=true`;
           const data = (await client.get(url)) as any;
-          if (i === 0) {
+          
+          // Get metadata from first response
+          if (isFirstRequest) {
             title = data?.title || title;
             category = data?.category_id ? `Category ID ${data.category_id}` : "";
             tags = Array.isArray(data?.tags) ? data.tags : [];
             slug = data?.slug || String(topic_id);
+            isFirstRequest = false;
           }
+          
+          // Extract posts from response
           const stream: any[] = Array.isArray(data?.post_stream?.posts) ? data.post_stream.posts : [];
+          
+          if (stream.length === 0) break; // No more posts
+          
+          // Sort posts by post_number to ensure correct order
           const sorted = stream.slice().sort((a, b) => (a.post_number || 0) - (b.post_number || 0));
+          
+          // Only take posts that are >= current post number (in case API returns some earlier posts)
           const filtered = sorted.filter((p) => (p.post_number || 0) >= current);
+          
+          if (filtered.length === 0) break; // No progress
+          
+          // Add posts to our result
           for (const p of filtered) {
             if (fetchedPosts.length >= post_limit) break;
             fetchedPosts.push({
@@ -52,8 +67,13 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
               content: (p.raw || p.cooked || p.excerpt || "").toString().slice(0, limit),
             });
           }
-          if (filtered.length === 0) break; // no progress
-          current = (filtered[filtered.length - 1]?.post_number || current) + 1;
+          
+          // If we've collected enough posts, stop
+          if (fetchedPosts.length >= post_limit) break;
+          
+          // Move to next batch: set current to the post number after the last one we got
+          const lastPostNumber = filtered[filtered.length - 1]?.post_number || current;
+          current = lastPostNumber + 1;
         }
 
         const lines: string[] = [];
