@@ -45,7 +45,7 @@ export async function registerAllTools(
   registerReadTopic(server, ctx, { allowWrites: false });
   // registerReadPost(server, ctx, { allowWrites: false });
   // registerListCategories(server, ctx, { allowWrites: false }); // Disabled - categories don't change
-  registerListTags(server, ctx, { allowWrites: false });
+  // registerListTags(server, ctx, { allowWrites: false });
   registerGetUser(server, ctx, { allowWrites: false });
   registerListUserPosts(server, ctx, { allowWrites: false });
   registerListHotTopics(server, ctx, { allowWrites: false });
