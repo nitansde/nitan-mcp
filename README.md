@@ -1,4 +1,8 @@
-## Discourse MCP
+## Nitan MCP
+
+This is a modified version of Discourse MCP. It will be a dedicated MCP client for https://www.uscardforum.com/
+
+## Original README
 
 A Model Context Protocol (MCP) stdio server that exposes Discourse forum capabilities as tools for AI agents.
 
