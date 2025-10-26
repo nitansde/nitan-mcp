@@ -5,17 +5,18 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
   const schema = z.object({
     topic_id: z.number().int().positive(),
     post_limit: z.number().int().min(1).max(500).optional().describe("Number of posts to fetch (default 30, max 500)"),
-    start_post_number: z.number().int().min(1).optional().describe("Start from this post number (default 1, 1-based)")
+    start_post_number: z.number().int().min(1).optional().describe("Start from this post number (default 1, 1-based)"),
+    username_filter: z.string().optional().describe("Filter posts by username (only show posts from this user)")
   });
 
   server.registerTool(
     "discourse_read_topic",
     {
       title: "Read Topic",
-      description: "Read a topic metadata and first N posts.",
+      description: "Read a topic metadata and posts. Can optionally filter to show only posts from a specific user.",
       inputSchema: schema.shape,
     },
-    async ({ topic_id, post_limit = 30, start_post_number = 1 }, _extra: any) => {
+    async ({ topic_id, post_limit = 30, start_post_number = 1, username_filter }, _extra: any) => {
       try {
         const { base, client } = ctx.siteState.ensureSelectedSite();
         const start = start_post_number;
@@ -29,10 +30,19 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
         let current = start;
         let isFirstRequest = true;
         
+        // Build URL with optional username filter
+        const buildUrl = (postNumber: number) => {
+          let url = `/t/${topic_id}/${postNumber}.json?include_raw=true`;
+          if (username_filter) {
+            url += `&username_filters=${encodeURIComponent(username_filter)}`;
+          }
+          return url;
+        };
+        
         // Loop until we have enough posts or no more posts available
         while (fetchedPosts.length < post_limit) {
           // Use the /t/{topic_id}/{post_number}.json endpoint which returns ~15 posts starting from post_number
-          const url = `/t/${topic_id}/${current}.json?include_raw=true`;
+          const url = buildUrl(current);
           const data = (await client.get(url)) as any;
           
           // Get metadata from first response
@@ -80,6 +90,7 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
         lines.push(`# ${title}`);
         if (category) lines.push(category);
         if (tags.length) lines.push(`Tags: ${tags.join(", ")}`);
+        if (username_filter) lines.push(`Filtered by user: @${username_filter}`);
         lines.push("");
         for (const p of fetchedPosts) {
           lines.push(`- Post #${p.number} by @${p.username} (${p.created_at})`);
