@@ -14,6 +14,11 @@ export interface HttpClientOptions {
   initialCookies?: string; // Cookie string in format "name1=value1; name2=value2"
   useCloudscraper?: boolean; // Use Python cloudscraper to bypass Cloudflare
   pythonPath?: string; // Path to Python executable (default: "python3")
+  loginCredentials?: {
+    username: string;
+    password: string;
+    second_factor_token?: string;
+  };
 }
 
 export class HttpError extends Error {
@@ -254,15 +259,26 @@ export class HttpClient {
       cookiesObj[key] = value;
     });
 
+    // Log cookies being sent
+    this.opts.logger.debug(`Sending ${Object.keys(cookiesObj).length} cookies to cloudscraper: ${Object.keys(cookiesObj).join(", ")}`);
+
     try {
-      const result = await this.cloudscraperClient.request({
+      const requestData: any = {
         url,
         method,
         headers,
         body: body !== undefined ? JSON.stringify(body) : undefined,
         cookies: cookiesObj,
         timeout: Math.floor(this.opts.timeoutMs / 1000), // Convert to seconds
-      });
+      };
+
+      // Add login credentials if provided
+      if (this.opts.loginCredentials) {
+        requestData.login = this.opts.loginCredentials;
+        this.opts.logger.debug(`Including login credentials for ${this.opts.loginCredentials.username}`);
+      }
+
+      const result = await this.cloudscraperClient.request(requestData);
 
       if (!result.success) {
         throw new Error(`Cloudscraper error: ${result.error} (${result.error_type})`);

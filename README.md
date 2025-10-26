@@ -64,6 +64,8 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   - **Cloudscraper** (automatic Cloudflare bypass - requires Python): **`--use_cloudscraper=true`**
     - Requires Python 3.7+ and `pip3 install cloudscraper`
     - Automatically solves Cloudflare JavaScript challenges without manual cookie management
+    - **Supports login**: Add `username` and `password` to `auth_pairs` to access private content
+    - **Session persistence**: Login is maintained across all requests automatically
     - See [CLOUDSCRAPER_QUICKSTART.md](CLOUDSCRAPER_QUICKSTART.md) for setup instructions
   - You can include multiple entries in `auth_pairs`; the matching entry is used for the selected site. If both `user_api_key` and `api_key` are provided for the same site, `user_api_key` takes precedence.
 

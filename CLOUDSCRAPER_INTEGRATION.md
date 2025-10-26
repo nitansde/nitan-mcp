@@ -70,7 +70,7 @@ pnpm build
 cat > cloudscraper.json <<EOF
 {
   "use_cloudscraper": true,
-  "site": "https://www.uscartool.com",
+  "site": "https://www.uscardforum.com/",
   "log_level": "debug"
 }
 EOF
@@ -145,7 +145,7 @@ node dist/index.js --profile cloudscraper.json
 Test the Python script directly:
 
 ```bash
-echo '{"url":"https://www.uscartool.com","method":"GET","headers":{},"timeout":30}' | python3 src/http/cloudscraper_wrapper.py
+echo '{"url":"https://www.uscardforum.com/","method":"GET","headers":{},"timeout":30}' | python3 src/http/cloudscraper_wrapper.py
 ```
 
 Expected output:

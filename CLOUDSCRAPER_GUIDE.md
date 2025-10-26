@@ -43,7 +43,7 @@ Add `use_cloudscraper: true` to your profile or use the `--use_cloudscraper` fla
   "python_path": "python3",
   "auth_pairs": [
     {
-      "site": "https://www.uscartool.com"
+      "site": "https://www.uscardforum.com/"
     }
   ]
 }
@@ -52,7 +52,7 @@ Add `use_cloudscraper: true` to your profile or use the `--use_cloudscraper` fla
 **Using command line:**
 
 ```bash
-node dist/index.js --use_cloudscraper=true --site=https://www.uscartool.com
+node dist/index.js --use_cloudscraper=true --site=https://www.uscardforum.com/
 ```
 
 ### Custom Python Path
