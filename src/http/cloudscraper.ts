@@ -79,6 +79,8 @@ export class CloudscraperClient {
 
   async request(req: CloudscraperRequest): Promise<CloudscraperResponse> {
     return new Promise((resolve, reject) => {
+      this.logger.debug(`Attempting to spawn Python: ${this.pythonPath} ${this.scriptPath}`);
+      
       const python = spawn(this.pythonPath, [this.scriptPath]);
 
       let stdout = "";
@@ -102,6 +104,22 @@ export class CloudscraperClient {
 
         this.logger.debug(`Python process exited with code: ${code}`);
         this.logger.debug(`Raw stdout length: ${stdout.length} bytes`);
+        
+        if (stdout.length === 0) {
+          this.logger.error(`Python script produced no output!`);
+          this.logger.error(`This usually means:`);
+          this.logger.error(`  1. Python dependencies not installed (run: ${this.pythonPath === 'python' ? 'pip' : 'pip3'} install -r requirements.txt)`);
+          this.logger.error(`  2. Python script crashed (check stderr above)`);
+          this.logger.error(`  3. Wrong Python executable (try: python or python3)`);
+          
+          if (stderr.includes('ModuleNotFoundError') || stderr.includes('ImportError')) {
+            reject(new Error(`Python dependencies missing. Run: ${this.pythonPath === 'python' ? 'pip' : 'pip3'} install cloudscraper brotli`));
+          } else {
+            reject(new Error(`Python script produced no output. Exit code: ${code}. Check logs above.`));
+          }
+          return;
+        }
+        
         this.logger.debug(`Raw stdout (first 500 chars): ${stdout.substring(0, 500)}`);
         
         // Check for binary data
@@ -130,6 +148,8 @@ export class CloudscraperClient {
 
       python.on("error", (err) => {
         this.logger.error(`Failed to spawn Python process: ${err.message}`);
+        this.logger.error(`Make sure Python is installed and in your PATH`);
+        this.logger.error(`Try running: ${this.pythonPath} --version`);
         reject(new Error(`Failed to spawn Python: ${err.message}`));
       });
 

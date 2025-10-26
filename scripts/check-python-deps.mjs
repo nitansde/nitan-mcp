@@ -23,7 +23,13 @@ try {
     console.log(`Found ${pythonVersion}`);
   } catch (error2) {
     console.warn('Warning: Python not found. Cloudscraper features will not work.');
-    console.warn('To use cloudscraper, install Python 3.7+ and run: pip install -r requirements.txt');
+    console.warn('');
+    console.warn('To use cloudscraper for bypassing Cloudflare, please install Python:');
+    console.warn('  • Download Python 3.7+ from: https://www.python.org/downloads/');
+    console.warn('  • On Windows: Make sure to check "Add Python to PATH" during installation');
+    console.warn('  • On Mac: brew install python3');
+    console.warn('  • On Linux: sudo apt-get install python3 python3-pip');
+    console.warn('');
     process.exit(0); // Don't fail installation
   }
 }
@@ -39,7 +45,13 @@ try {
     execSync(`${pipCmd} --version`, { encoding: 'utf-8', stdio: 'ignore' });
   } catch (error2) {
     console.warn('Warning: pip not found. Cannot install Python dependencies.');
-    console.warn('Install pip and run: pip install -r requirements.txt');
+    console.warn('');
+    console.warn('Please install pip:');
+    console.warn('  • Python 3.4+ usually includes pip by default');
+    console.warn('  • If missing, download get-pip.py from: https://bootstrap.pypa.io/get-pip.py');
+    console.warn('  • Then run: python get-pip.py');
+    console.warn('');
+    console.warn('After installing pip, run: pip install -r requirements.txt');
     process.exit(0); // Don't fail installation
   }
 }
