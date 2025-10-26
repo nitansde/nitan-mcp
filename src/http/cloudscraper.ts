@@ -1,13 +1,43 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { existsSync } from "node:fs";
 import type { Logger } from "../util/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Find the Python script - it's in src/http not dist/http
-const scriptPath = join(__dirname, "..", "..", "src", "http", "cloudscraper_wrapper.py");
+// Find the Python script - check multiple locations
+function findPythonScript(): string {
+  // 1. When running from built dist/ (development or after build)
+  const distPath = join(__dirname, "cloudscraper_wrapper.py");
+  if (existsSync(distPath)) {
+    return distPath;
+  }
+  
+  // 2. When running from source (development)
+  const srcPath = join(__dirname, "..", "..", "src", "http", "cloudscraper_wrapper.py");
+  if (existsSync(srcPath)) {
+    return srcPath;
+  }
+  
+  // 3. When installed via npm as @nitan/mcp (the file is copied to dist/)
+  // This handles: node_modules/@nitan/mcp/dist/http/cloudscraper_wrapper.py
+  const npmDistPath = join(__dirname, "cloudscraper_wrapper.py");
+  if (existsSync(npmDistPath)) {
+    return npmDistPath;
+  }
+  
+  // 4. Fallback: try src/http relative to package root
+  const packageSrcPath = join(__dirname, "..", "..", "src", "http", "cloudscraper_wrapper.py");
+  if (existsSync(packageSrcPath)) {
+    return packageSrcPath;
+  }
+  
+  throw new Error("cloudscraper_wrapper.py not found. Please ensure Python script is bundled with the package.");
+}
+
+const scriptPath = findPythonScript();
 
 export interface CloudscraperRequest {
   url: string;

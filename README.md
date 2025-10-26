@@ -2,6 +2,58 @@
 
 This is a modified version of Discourse MCP. It will be a dedicated MCP client for https://www.uscardforum.com/
 
+### Quick Installation
+
+**Using npx (recommended):**
+```bash
+npx -y @nitan/mcp@latest
+```
+
+The package will automatically:
+- Check for Python 3.7+ (required for Cloudflare bypass)
+- Install Python dependencies (`cloudscraper`) if pip3 is available
+- Set up the MCP server
+
+**Prerequisites:**
+- Node.js 18+
+- Python 3.7+ (for Cloudflare bypass features)
+- pip3 (for automatic Python dependency installation)
+
+**If Python dependencies fail to install automatically:**
+```bash
+pip3 install cloudscraper
+```
+
+### MCP Client Configuration
+
+**For Claude Desktop (macOS):**
+```json
+{
+  "mcpServers": {
+    "nitan": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@nitan/mcp@latest",
+        "--site",
+        "https://www.uscardforum.com/",
+        "--use_cloudscraper",
+        "--username",
+        "YOUR_USERNAME",
+        "--password",
+        "YOUR_PASSWORD",
+        "--log_level",
+        "info"
+      ]
+    }
+  }
+}
+```
+
+**Configuration file location:**
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
 ## Original README
 
 A Model Context Protocol (MCP) stdio server that exposes Discourse forum capabilities as tools for AI agents.
