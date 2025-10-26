@@ -46,12 +46,12 @@ export async function registerAllTools(
   // registerReadPost(server, ctx, { allowWrites: false });
   // registerListCategories(server, ctx, { allowWrites: false }); // Disabled - categories don't change
   // registerListTags(server, ctx, { allowWrites: false });
-  registerGetUser(server, ctx, { allowWrites: false });
+  // registerGetUser(server, ctx, { allowWrites: false });
   registerListUserPosts(server, ctx, { allowWrites: false });
   registerListHotTopics(server, ctx, { allowWrites: false });
   registerListNotifications(server, ctx, { allowWrites: false });
   registerListTopTopics(server, ctx, { allowWrites: false });
-  registerFilterTopics(server, ctx, { allowWrites: false });
+  // registerFilterTopics(server, ctx, { allowWrites: false });
   registerCreatePost(server, ctx, { allowWrites: opts.allowWrites });
   registerCreateUser(server, ctx, { allowWrites: opts.allowWrites });
   registerCreateCategory(server, ctx, { allowWrites: opts.allowWrites });

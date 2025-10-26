@@ -9,9 +9,9 @@ export const registerListUserPosts: RegisterFn = (server, ctx) => {
   });
 
   server.registerTool(
-    "discourse_list_user_posts",
+    "discourse_get_user_activity",
     {
-      title: "List User Posts",
+      title: "Get User Activity",
       description: "Get a list of user posts and replies from a Discourse instance, with the most recent first. Returns 30 posts per page by default. Use the page parameter to paginate (page 0 = offset 0, page 1 = offset 30, etc.).",
       inputSchema: schema.shape,
     },
