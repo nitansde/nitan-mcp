@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
+import { getCategoryName } from "../categories.js";
 
 export const registerListHotTopics: RegisterFn = (server, ctx) => {
   const schema = z
@@ -65,7 +66,7 @@ export const registerListHotTopics: RegisterFn = (server, ctx) => {
           
           // Add category if available
           if (topic.category_id) {
-            const categoryName = topic.category_name || `Category ${topic.category_id}`;
+            const categoryName = topic.category_name || getCategoryName(topic.category_id);
             lines.push(`   Category: ${categoryName}`);
           }
           

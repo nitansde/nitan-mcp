@@ -1,14 +1,19 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
+import { getCategoryByName, getCategoryById } from "../categories.js";
 
 export const registerFilterTopics: RegisterFn = (server, ctx) => {
   const schema = z
     .object({
+      categories: z
+        .array(z.string())
+        .optional()
+        .describe("Category names in natural language (e.g., ['信用卡', '银行账户']). Multiple categories are combined with OR logic."),
       filter: z
         .string()
-        .min(1)
+        .optional()
         .describe(
-          "Filter query, e.g. 'category:support status:open created-after:30 order:activity'",
+          "Additional filter query (optional), e.g. 'status:open created-after:30 order:activity'. If categories are provided, they will be added to this filter.",
         ),
       page: z
         .number()
@@ -27,13 +32,12 @@ export const registerFilterTopics: RegisterFn = (server, ctx) => {
     .strict();
 
   const description =
-    "Filter topics with a concise query language: use key:value tokens separated by spaces; " +
-    "category/categories for categories (comma = OR, '=category' = without subcats, '-' prefix = exclude), " +
-    "tag/tags (comma = OR, '+' = AND) and tag_group; status:(open|closed|archived|listed|unlisted|public) and personal in:(bookmarked|watching|tracking|muted|pinned); " +
-    "dates: created/activity/latest-post-(before|after) with YYYY-MM-DD or N (days); " +
-    "numeric: likes[-op]-(min|max), posts-(min|max), posters-(min|max), views-(min|max); " +
-    "order: activity|created|latest-post|likes|likes-op|posters|title|views|category with optional -asc; " +
-    "free text terms are matched full-text. Results are permission-aware.";
+    "Filter topics by categories and other criteria. You can specify categories by their natural language names (e.g., '信用卡', '旅行', '败家'). " +
+    "Additional filters support: status:(open|closed|archived|listed|unlisted|public), personal in:(bookmarked|watching|tracking|muted|pinned), " +
+    "dates: created/activity/latest-post-(before|after) with YYYY-MM-DD or N (days), " +
+    "numeric: likes[-op]-(min|max), posts-(min|max), posters-(min|max), views-(min|max), " +
+    "order: activity|created|latest-post|likes|likes-op|posters|title|views|category with optional -asc. " +
+    "Results are permission-aware.";
 
   server.registerTool(
     "discourse_filter_topics",
@@ -42,31 +46,110 @@ export const registerFilterTopics: RegisterFn = (server, ctx) => {
       description,
       inputSchema: schema.shape,
     },
-    async ({ filter, page = 0, per_page }, _extra: any) => {
+    async ({ categories, filter = "", page = 0, per_page }, _extra: any) => {
       try {
         const { base, client } = ctx.siteState.ensureSelectedSite();
+        
+        // Build the filter query
+        let finalFilter = filter.trim();
+        
+        // Convert category names to category slugs and add to filter
+        if (categories && categories.length > 0) {
+          const categorySlugs: string[] = [];
+          const notFoundCategories: string[] = [];
+          
+          for (const catName of categories) {
+            const category = getCategoryByName(catName);
+            if (category) {
+              // Use slug if available and not empty, otherwise use category ID
+              const identifier = category.slug && category.slug.trim() !== "" 
+                ? category.slug 
+                : String(category.id);
+              categorySlugs.push(`#${identifier}`);
+            } else {
+              notFoundCategories.push(catName);
+            }
+          }
+          
+          if (notFoundCategories.length > 0) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Categories not found: ${notFoundCategories.join(", ")}. Please use valid category names like: 信用卡, 银行账户, 旅行, 航空常旅客, 酒店常旅客, 理财, 股市投资, 败家, 电子产品, 生活, 吃货, 法律, 签证与身份（美国）, 搬砖, etc.`,
+                },
+              ],
+              isError: true,
+            };
+          }
+          
+          if (categorySlugs.length > 0) {
+            // Multiple categories separated by space (OR logic in search)
+            const categoryFilter = categorySlugs.join(" ");
+            finalFilter = finalFilter ? `${categoryFilter} ${finalFilter}` : categoryFilter;
+          }
+        }
+        
+        // If no filter provided at all, return error
+        if (!finalFilter) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: "Please provide either categories or filter criteria.",
+              },
+            ],
+            isError: true,
+          };
+        }
+        
         const params = new URLSearchParams();
-        params.set("q", filter);
+        params.set("q", finalFilter);
         params.set("page", String(page));
         if (per_page) params.set("per_page", String(per_page));
 
         const data = (await client.get(
-          `/filter.json?${params.toString()}`,
+          `/search.json?${params.toString()}`,
         )) as any;
-        const list = data?.topic_list ?? data;
-        const topics: any[] = Array.isArray(list?.topics) ? list.topics : [];
-        const perPage = per_page ?? list?.per_page ?? undefined;
-        const moreUrl: string | undefined =
-          list?.more_topics_url || list?.more_url || undefined;
+        
+        // Search endpoint returns posts, we need to extract unique topics
+        const posts: any[] = Array.isArray(data?.posts) ? data.posts : [];
+        const topics: any[] = Array.isArray(data?.topics) ? data.topics : [];
+        
+        // Create a map of topic_id to topic info
+        const topicMap = new Map();
+        topics.forEach((t: any) => {
+          topicMap.set(t.id, t);
+        });
+        
+        // Get unique topics from posts
+        const uniqueTopicIds = new Set<number>();
+        posts.forEach((p: any) => {
+          if (p.topic_id) {
+            uniqueTopicIds.add(p.topic_id);
+          }
+        });
+        
+        // Build items list from unique topics
+        const items = Array.from(uniqueTopicIds)
+          .map((topicId) => {
+            const topic = topicMap.get(topicId);
+            if (topic) {
+              return {
+                id: topic.id,
+                title: topic.title || topic.fancy_title || `Topic ${topic.id}`,
+                slug: topic.slug || String(topic.id),
+              };
+            }
+            return null;
+          })
+          .filter((item) => item !== null);
 
-        const items = topics.map((t) => ({
-          id: t.id,
-          title: t.title || t.fancy_title || `Topic ${t.id}`,
-          slug: t.slug || String(t.id),
-        }));
+        const perPage = per_page;
+        const moreUrl: string | undefined = undefined; // Search API doesn't provide this
 
         const lines: string[] = [];
-        lines.push(`Filter: "${filter}" — Page ${page}`);
+        lines.push(`Filter: "${finalFilter}" — Page ${page}`);
         if (items.length === 0) {
           lines.push("No topics matched.");
         } else {
@@ -82,18 +165,13 @@ export const registerFilterTopics: RegisterFn = (server, ctx) => {
         const jsonFooter: any = {
           page,
           per_page: perPage,
-          results: items.map((it) => ({
+          filter: finalFilter,
+          results: items.map((it: any) => ({
             id: it.id,
             title: it.title,
             url: `${base}/t/${it.slug}/${it.id}`,
           })),
         };
-        if (moreUrl) {
-          const abs = moreUrl.startsWith("http")
-            ? moreUrl
-            : `${base}${moreUrl.startsWith("/") ? "" : "/"}${moreUrl}`;
-          jsonFooter.next_url = abs;
-        }
 
         const text =
           lines.join("\n") +
