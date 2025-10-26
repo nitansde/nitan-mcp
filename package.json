@@ -1,6 +1,6 @@
 {
   "name": "@nitansde/mcp",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Nitan MCP CLI server for uscardforum.com (modified Discourse MCP with Cloudflare bypass)",
   "private": false,
   "type": "module",
