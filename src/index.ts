@@ -40,6 +40,9 @@ const ProfileSchema = z
             user_api_key: z.string().optional(),
             user_api_client_id: z.string().optional(),
             cookies: z.string().optional().describe("Cookie string in format 'name1=value1; name2=value2'"),
+            username: z.string().optional().describe("Username for login (used with cloudscraper)"),
+            password: z.string().optional().describe("Password for login (used with cloudscraper)"),
+            second_factor_token: z.string().optional().describe("2FA token (used with cloudscraper)"),
           })
           .strict()
       )

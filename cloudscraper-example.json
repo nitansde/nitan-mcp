@@ -2,5 +2,5 @@
   "use_cloudscraper": true,
   "python_path": "python3",
   "log_level": "debug",
-  "site": "https://www.uscartool.com"
+  "site": "https://www.uscardforum.com/"
 }

@@ -54,7 +54,7 @@ Here's how you'd format the `cf_clearance` cookie from your browser:
 {
   "auth_pairs": [
     {
-      "site": "https://www.uscartool.com",
+      "site": "https://www.uscardforum.com/",
       "cookies": "cf_clearance=6YWUaEjpxj0F9IuH8pEWJHMPwge4i2CTR014s..."
     }
   ]

@@ -8,6 +8,9 @@ export type AuthOverride = {
   user_api_key?: string;
   user_api_client_id?: string;
   cookies?: string; // Cookie string in format "name1=value1; name2=value2"
+  username?: string; // Username for login (used with cloudscraper)
+  password?: string; // Password for login (used with cloudscraper)
+  second_factor_token?: string; // 2FA token (used with cloudscraper)
 };
 
 function normalizeBase(url: string): string {
@@ -52,6 +55,7 @@ export class SiteState {
 
     const auth = this.resolveAuthForSite(base);
     const cookies = this.resolveCookiesForSite(base);
+    const loginCreds = this.resolveLoginForSite(base);
     const client = new HttpClient({
       baseUrl: base,
       timeoutMs: this.opts.timeoutMs,
@@ -60,6 +64,7 @@ export class SiteState {
       initialCookies: cookies,
       useCloudscraper: this.opts.useCloudscraper,
       pythonPath: this.opts.pythonPath,
+      loginCredentials: loginCreds,
     } as any);
     this.clientCache.set(base, client);
     return { base, client };
@@ -87,6 +92,19 @@ export class SiteState {
     const overrides = this.opts.authOverrides || [];
     const match = overrides.find((o) => normalizeBase(o.site) === base || this.sameOrigin(o.site, base));
     return match?.cookies;
+  }
+
+  private resolveLoginForSite(base: string): { username: string; password: string; second_factor_token?: string } | undefined {
+    const overrides = this.opts.authOverrides || [];
+    const match = overrides.find((o) => normalizeBase(o.site) === base || this.sameOrigin(o.site, base));
+    if (match?.username && match?.password) {
+      return {
+        username: match.username,
+        password: match.password,
+        second_factor_token: match.second_factor_token,
+      };
+    }
+    return undefined;
   }
 
   private sameOrigin(a: string, b: string): boolean {

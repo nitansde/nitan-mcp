@@ -16,24 +16,58 @@
 
 ### Method 1: Using a profile file (Recommended)
 
+**Basic usage (no login):**
 Create `cloudscraper.json`:
 ```json
 {
   "use_cloudscraper": true,
-  "site": "https://www.uscartool.com",
+  "site": "https://www.uscardforum.com/",
   "log_level": "debug"
+}
+```
+
+**With login (access private content):**
+Create `cloudscraper-login.json`:
+```json
+{
+  "use_cloudscraper": true,
+  "site": "https://www.uscardforum.com/",
+  "log_level": "debug",
+  "auth_pairs": [
+    {
+      "site": "https://www.uscardforum.com/",
+      "username": "your-username",
+      "password": "your-password"
+    }
+  ]
+}
+```
+
+**With 2FA:**
+```json
+{
+  "use_cloudscraper": true,
+  "site": "https://www.uscardforum.com/",
+  "auth_pairs": [
+    {
+      "site": "https://www.uscardforum.com/",
+      "username": "your-username",
+      "password": "your-password",
+      "second_factor_token": "123456"
+    }
+  ]
 }
 ```
 
 Run:
 ```bash
-node dist/index.js --profile cloudscraper.json
+node dist/index.js --profile cloudscraper-login.json
 ```
 
 ### Method 2: Command line
 
 ```bash
-node dist/index.js --use_cloudscraper=true --site=https://www.uscartool.com --log_level=debug
+node dist/index.js --use_cloudscraper=true --site=https://www.uscardforum.com/ --log_level=debug
 ```
 
 ## What Happens

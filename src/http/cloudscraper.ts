@@ -16,6 +16,11 @@ export interface CloudscraperRequest {
   body?: string;
   cookies?: Record<string, string>;
   timeout?: number;
+  login?: {
+    username: string;
+    password: string;
+    second_factor_token?: string;
+  };
 }
 
 export interface CloudscraperResponse {
@@ -24,6 +29,8 @@ export interface CloudscraperResponse {
   headers?: Record<string, string>;
   body?: string;
   cookies?: Record<string, string>;
+  csrf_token?: string;
+  message?: string;
   error?: string;
   error_type?: string;
 }
