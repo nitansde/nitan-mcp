@@ -61,8 +61,19 @@ def fetch_csrf_token(scraper: cloudscraper.CloudScraper, base_url: str) -> Optio
                 # Store token in session headers
                 scraper.headers['X-CSRF-Token'] = token
                 return token
+        else:
+            print(f"ERROR: Failed to obtain CSRF token: HTTP {response.status_code}", file=sys.stderr)
+            print(f"ERROR: 获取 CSRF 令牌失败：HTTP {response.status_code}", file=sys.stderr)
+            print(f"ERROR: This usually means Cloudflare challenge bypass failed", file=sys.stderr)
+            print(f"ERROR: 这通常意味着 Cloudflare 挑战绕过失败", file=sys.stderr)
+            print(f"ERROR: Response preview: {response.text[:200]}", file=sys.stderr)
     except Exception as e:
-        print(f"Warning: Failed to fetch CSRF token: {e}", file=sys.stderr)
+        print(f"ERROR: Failed to fetch CSRF token: {e}", file=sys.stderr)
+        print(f"ERROR: 获取 CSRF 令牌失败：{e}", file=sys.stderr)
+        print(f"ERROR: This usually means Cloudflare challenge bypass failed", file=sys.stderr)
+        print(f"ERROR: 这通常意味着 Cloudflare 挑战绕过失败", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
     return None
 
 def login(scraper: cloudscraper.CloudScraper, base_url: str, username: str, password: str, 

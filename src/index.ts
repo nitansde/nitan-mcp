@@ -237,17 +237,24 @@ except ImportError as e:
     
     python.on("close", (code) => {
       if (code === 0 && output.includes("OK")) {
-        logger.debug("Python dependencies check: OK");
+        logger.debug("Python dependencies check: All required packages are installed");
         resolve();
       } else {
         // Dependencies are missing, show warning
-        logger.info("⚠️  Python dependencies not fully installed");
-        logger.info("   The server will start, but Cloudflare bypass features may not work.");
+        logger.info("⚠️  Warning: Python dependencies are not fully installed");
+        logger.info("⚠️  警告：Python 依赖包未完全安装");
+        logger.info("   Server will start, but Cloudflare bypass features will not work.");
+        logger.info("   服务器将启动，但 Cloudflare 绕过功能将无法使用。");
         logger.info("");
-        logger.info("   To install dependencies, run:");
+        logger.info("   Missing packages: cloudscraper and/or curl-cffi");
+        logger.info("   缺少的包：cloudscraper 和/或 curl-cffi");
+        logger.info("   To fix this, run one of these commands:");
+        logger.info("   要修复此问题，请运行以下命令之一：");
+        logger.info("");
         logger.info(`   ${pythonPath === "python" ? "pip" : "pip3"} install cloudscraper curl-cffi`);
         logger.info("");
-        logger.info("   Or install from requirements.txt:");
+        logger.info("   Or install all dependencies from requirements.txt:");
+        logger.info("   或从 requirements.txt 安装所有依赖：");
         logger.info(`   ${pythonPath === "python" ? "pip" : "pip3"} install -r requirements.txt`);
         logger.info("");
         resolve(); // Don't block server startup
@@ -256,12 +263,23 @@ except ImportError as e:
     
     python.on("error", (err) => {
       // Python not found
-      logger.info("⚠️  Python not found");
-      logger.info("   The server will start, but Cloudflare bypass features will not work.");
+      logger.info(`⚠️  Warning: Python executable not found (tried: ${pythonPath})`);
+      logger.info(`⚠️  警告：找不到 Python 可执行文件（尝试了：${pythonPath}）`);
+      logger.info("   Server will start, but Cloudflare bypass features will not work.");
+      logger.info("   服务器将启动，但 Cloudflare 绕过功能将无法使用。");
       logger.info("");
       logger.info("   To enable Cloudflare bypass:");
+      logger.info("   要启用 Cloudflare 绕过功能：");
       logger.info("   1. Install Python 3.7+ from https://python.org");
-      logger.info("   2. Install dependencies: pip3 install cloudscraper curl-cffi");
+      logger.info("   1. 从 https://python.org 安装 Python 3.7+");
+      logger.info(`   2. Make sure '${pythonPath}' is in your PATH`);
+      logger.info(`   2. 确保 '${pythonPath}' 在您的 PATH 环境变量中`);
+      logger.info("   3. Install required packages: pip3 install cloudscraper curl-cffi");
+      logger.info("   3. 安装所需的包：pip3 install cloudscraper curl-cffi");
+      logger.info("");
+      logger.info(`   If Python is installed with a different name, use:`);
+      logger.info(`   如果 Python 以不同的名称安装，请使用：`);
+      logger.info(`   --python-path=/path/to/python`);
       logger.info("");
       resolve(); // Don't block server startup
     });
