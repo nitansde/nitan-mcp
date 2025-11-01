@@ -7,7 +7,7 @@ This is a modified version of Discourse MCP. It will be a dedicated MCP client f
 **Prerequisites:**
 - **Node.js 18 or higher** (required)
 - Python 3.7+ (required for Cloudflare bypass)
-- pip3 (for automatic Python dependency installation)
+- pip3 (for Python dependency installation)
 
 **Check your Node.js version:**
 ```bash
@@ -25,23 +25,32 @@ nvm use 18
 
 **Using npx (recommended):**
 ```bash
-npx -y @nitan/mcp@latest
+npx -y @nitansde/mcp@latest
 ```
 
-The package will automatically:
-- Check for Python 3.7+ (required for Cloudflare bypass)
-- Install Python dependencies (`cloudscraper`) if pip3 is available
-- Set up the MCP server
+**What happens automatically:**
+1. ✅ Downloads and caches the package
+2. ✅ Installs Node.js dependencies
+3. ✅ Runs `postinstall` script to check/install Python dependencies
+4. ✅ Checks Python dependencies at runtime and shows helpful warnings if missing
 
-**Prerequisites:**
-- Node.js 18+
-- Python 3.7+ (for Cloudflare bypass features)
-- pip3 (for automatic Python dependency installation)
-
-**If Python dependencies fail to install automatically:**
+**If Python dependencies aren't installed automatically:**
 ```bash
-pip3 install cloudscraper
+pip3 install cloudscraper curl-cffi
+# Or install from requirements.txt
+pip3 install -r requirements.txt
 ```
+
+The server will start even if Python dependencies are missing, but Cloudflare bypass features won't work until you install them.
+
+### Cloudflare Bypass
+
+This server uses an intelligent **dual-method Cloudflare bypass strategy**:
+1. Tries `cloudscraper` first (mature, established)
+2. Automatically falls back to `curl_cffi` if cloudscraper fails (better browser impersonation)
+3. Remembers failures and uses the working method for subsequent requests
+
+This provides maximum reliability against Cloudflare protection. See [CLOUDFLARE_BYPASS.md](CLOUDFLARE_BYPASS.md) for details.
 
 ### MCP Client Configuration
 

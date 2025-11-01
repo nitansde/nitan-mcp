@@ -1,55 +1,50 @@
 #!/usr/bin/env python3
 """
-Cloudscraper wrapper for bypassing Cloudflare protection.
+curl_cffi wrapper for bypassing Cloudflare protection.
 This script receives HTTP request details via stdin and outputs the response via stdout.
 Supports session persistence and login functionality.
+curl_cffi provides better Cloudflare bypass than cloudscraper by impersonating real browsers.
 """
 
 import sys
 import json
-import cloudscraper
 from typing import Dict, Optional
 
-# Try to import brotli for decompression support
 try:
-    import brotli
-    HAS_BROTLI = True
+    from curl_cffi import requests
+    HAS_CURL_CFFI = True
 except ImportError:
-    HAS_BROTLI = False
-    print("[WARNING] brotli module not found. Install with: pip3 install brotli", file=sys.stderr)
+    HAS_CURL_CFFI = False
+    print("[ERROR] curl_cffi module not found. Install with: pip3 install curl-cffi", file=sys.stderr)
+    sys.exit(1)
 
-# Global scraper instance to maintain session across requests
-_scraper_instance: Optional[cloudscraper.CloudScraper] = None
+# Global session instance to maintain state across requests
+_session_instance: Optional[requests.Session] = None
 _base_url: Optional[str] = None
 
-def get_scraper(base_url: str) -> cloudscraper.CloudScraper:
-    """Get or create a cloudscraper instance with session persistence."""
-    global _scraper_instance, _base_url
+def get_session(base_url: str) -> requests.Session:
+    """Get or create a curl_cffi session with browser impersonation."""
+    global _session_instance, _base_url
     
-    # Create new scraper if URL changed or doesn't exist
-    if _scraper_instance is None or _base_url != base_url:
-        _scraper_instance = cloudscraper.create_scraper(
-            browser={
-                'browser': 'chrome',
-                'platform': 'windows',
-                'mobile': False,
-                'desktop': True
-            }
-        )
+    # Create new session if URL changed or doesn't exist
+    if _session_instance is None or _base_url != base_url:
+        # Use chrome120 impersonation for best Cloudflare bypass
+        _session_instance = requests.Session(impersonate="chrome120")
         _base_url = base_url
         
         # Warm up session with base URL
         try:
-            _scraper_instance.get(base_url, timeout=10, allow_redirects=True)
-        except Exception:
-            pass  # Ignore warm-up errors
+            _session_instance.get(base_url, timeout=10, allow_redirects=True)
+            print(f"[DEBUG] Warmed up session for {base_url}", file=sys.stderr)
+        except Exception as e:
+            print(f"[DEBUG] Session warm-up failed (non-critical): {e}", file=sys.stderr)
     
-    return _scraper_instance
+    return _session_instance
 
-def fetch_csrf_token(scraper: cloudscraper.CloudScraper, base_url: str) -> Optional[str]:
+def fetch_csrf_token(session: requests.Session, base_url: str) -> Optional[str]:
     """Fetch CSRF token from /session/csrf.json."""
     try:
-        response = scraper.get(
+        response = session.get(
             f"{base_url}/session/csrf.json",
             timeout=10,
             headers={'Accept': 'application/json'}
@@ -59,18 +54,19 @@ def fetch_csrf_token(scraper: cloudscraper.CloudScraper, base_url: str) -> Optio
             token = data.get('csrf')
             if token:
                 # Store token in session headers
-                scraper.headers['X-CSRF-Token'] = token
+                session.headers['X-CSRF-Token'] = token
+                print(f"[DEBUG] Obtained CSRF token: {token[:20]}...", file=sys.stderr)
                 return token
     except Exception as e:
-        print(f"Warning: Failed to fetch CSRF token: {e}", file=sys.stderr)
+        print(f"[WARNING] Failed to fetch CSRF token: {e}", file=sys.stderr)
     return None
 
-def login(scraper: cloudscraper.CloudScraper, base_url: str, username: str, password: str, 
+def login(session: requests.Session, base_url: str, username: str, password: str, 
           second_factor_token: Optional[str] = None) -> Dict:
     """Login to Discourse forum."""
     try:
         # Get CSRF token first
-        csrf_token = fetch_csrf_token(scraper, base_url)
+        csrf_token = fetch_csrf_token(session, base_url)
         if not csrf_token:
             return {
                 'success': False,
@@ -96,7 +92,8 @@ def login(scraper: cloudscraper.CloudScraper, base_url: str, username: str, pass
             'X-Requested-With': 'XMLHttpRequest'
         }
         
-        response = scraper.post(
+        print(f"[DEBUG] Attempting login for user: {username}", file=sys.stderr)
+        response = session.post(
             f"{base_url}/session.json",
             json=login_data,
             headers=headers,
@@ -105,6 +102,7 @@ def login(scraper: cloudscraper.CloudScraper, base_url: str, username: str, pass
         
         if response.status_code == 200:
             result = response.json()
+            print(f"[DEBUG] Login successful for {username}", file=sys.stderr)
             return {
                 'success': True,
                 'status': 200,
@@ -113,6 +111,7 @@ def login(scraper: cloudscraper.CloudScraper, base_url: str, username: str, pass
                 'csrf_token': csrf_token
             }
         else:
+            print(f"[ERROR] Login failed with status {response.status_code}", file=sys.stderr)
             return {
                 'success': False,
                 'status': response.status_code,
@@ -122,6 +121,7 @@ def login(scraper: cloudscraper.CloudScraper, base_url: str, username: str, pass
             }
     
     except Exception as e:
+        print(f"[ERROR] Login exception: {e}", file=sys.stderr)
         return {
             'success': False,
             'error': f'Login exception: {str(e)}',
@@ -130,7 +130,7 @@ def login(scraper: cloudscraper.CloudScraper, base_url: str, username: str, pass
 
 def make_request(data: Dict) -> Dict:
     """
-    Make an HTTP request using cloudscraper.
+    Make an HTTP request using curl_cffi.
     
     Args:
         data: Dictionary containing:
@@ -144,22 +144,25 @@ def make_request(data: Dict) -> Dict:
     
     Returns:
         Dictionary containing:
+            - success: Boolean indicating success/failure
             - status: HTTP status code
             - headers: Response headers
             - body: Response body (text)
             - cookies: Response cookies
             - csrf_token: CSRF token if available
+            - error: Error message if failed
+            - error_type: Error type if failed
     """
     # Extract base URL for session management
     url = data['url']
     base_url = '/'.join(url.split('/')[:3])  # Extract scheme://host
     
-    scraper = get_scraper(base_url)
+    session = get_session(base_url)
     
     # Set cookies if provided (these may include session cookies from previous requests)
     if data.get('cookies'):
-        scraper.cookies.update(data['cookies'])
-        print(f"[DEBUG] Applied {len(data['cookies'])} cookies to scraper: {list(data['cookies'].keys())}", file=sys.stderr)
+        session.cookies.update(data['cookies'])
+        print(f"[DEBUG] Applied {len(data['cookies'])} cookies: {list(data['cookies'].keys())}", file=sys.stderr)
     
     # Only attempt login if:
     # 1. Login credentials are provided AND
@@ -174,8 +177,8 @@ def make_request(data: Dict) -> Dict:
         has_session = False
         session_cookie_names = ['_t', '_forum_session', 'authentication_data']
         
-        # Check both scraper cookies and incoming cookies
-        all_cookies = set(scraper.cookies.keys())
+        # Check both session cookies and incoming cookies
+        all_cookies = set(session.cookies.keys())
         if data.get('cookies'):
             all_cookies.update(data['cookies'].keys())
         
@@ -192,52 +195,37 @@ def make_request(data: Dict) -> Dict:
             should_login = True
             print(f"[DEBUG] No session found, will attempt login for {username}", file=sys.stderr)
             second_factor = login_info.get('second_factor_token')
-            login_result = login(scraper, base_url, username, password, second_factor)
+            login_result = login(session, base_url, username, password, second_factor)
             if not login_result.get('success'):
                 return login_result
+            print(f"[DEBUG] Login completed successfully", file=sys.stderr)
         elif has_session:
             print(f"[DEBUG] Session exists, skipping login", file=sys.stderr)
     
     try:
         # Make the request
-        response = scraper.request(
+        print(f"[DEBUG] Making {data['method']} request to {url}", file=sys.stderr)
+        response = session.request(
             method=data['method'],
-            url=data['url'],
+            url=url,
             headers=data.get('headers', {}),
             data=data.get('body'),
             timeout=data.get('timeout', 30)
         )
         
-        # Extract ALL cookies from scraper session (not just response cookies)
+        print(f"[DEBUG] Response status: {response.status_code}", file=sys.stderr)
+        
+        # Extract ALL cookies from session (not just response cookies)
         # This includes cf_clearance and other Cloudflare cookies
-        cookies = {key: value for key, value in scraper.cookies.items()}
-        print(f"[DEBUG] Returning {len(cookies)} cookies to Node.js: {list(cookies.keys())}", file=sys.stderr)
+        cookies = {key: value for key, value in session.cookies.items()}
+        print(f"[DEBUG] Returning {len(cookies)} cookies: {list(cookies.keys())}", file=sys.stderr)
         
         # Get CSRF token if available
-        csrf_token = scraper.headers.get('X-CSRF-Token')
+        csrf_token = session.headers.get('X-CSRF-Token')
         
-        # Ensure body is properly decoded as text
-        # The requests library should auto-decode gzip, but let's ensure it
+        # Get response body as text
         try:
-            content_encoding = response.headers.get('Content-Encoding', '').lower()
-            
-            # If brotli compressed and we have the library, decompress manually
-            if content_encoding == 'br' and HAS_BROTLI:
-                print(f"[DEBUG] Manually decompressing Brotli content", file=sys.stderr)
-                decompressed = brotli.decompress(response.content)
-                body_text = decompressed.decode('utf-8', errors='replace')
-            else:
-                # Force encoding detection if not set
-                if response.encoding is None or response.encoding == 'ISO-8859-1':
-                    # Try to detect from content-type or default to utf-8
-                    response.encoding = response.apparent_encoding or 'utf-8'
-                
-                # Get the text content - this should handle gzip automatically
-                body_text = response.text
-            
-            # Verify it's actually decoded
-            print(f"[DEBUG] Response encoding: {response.encoding}", file=sys.stderr)
-            print(f"[DEBUG] Content-Encoding header: {response.headers.get('Content-Encoding', 'none')}", file=sys.stderr)
+            body_text = response.text
             print(f"[DEBUG] Response body length: {len(body_text)} chars", file=sys.stderr)
             print(f"[DEBUG] Response body preview (first 200 chars): {body_text[:200]}", file=sys.stderr)
             
@@ -245,11 +233,9 @@ def make_request(data: Dict) -> Dict:
             if body_text.strip().startswith('{') or body_text.strip().startswith('['):
                 print(f"[DEBUG] Body appears to be JSON", file=sys.stderr)
             else:
-                print(f"[DEBUG] WARNING: Body does not appear to be JSON!", file=sys.stderr)
-                print(f"[DEBUG] First bytes as hex: {body_text[:50].encode('latin1', errors='ignore').hex()}", file=sys.stderr)
-                
+                print(f"[DEBUG] WARNING: Body does not appear to be JSON", file=sys.stderr)
         except Exception as e:
-            print(f"[DEBUG] Failed to decode response body: {e}", file=sys.stderr)
+            print(f"[ERROR] Failed to decode response body: {e}", file=sys.stderr)
             import traceback
             traceback.print_exc(file=sys.stderr)
             # Fallback: try to decode as utf-8
@@ -267,10 +253,15 @@ def make_request(data: Dict) -> Dict:
         }
     
     except Exception as e:
+        error_msg = str(e)
+        error_type = type(e).__name__
+        print(f"[ERROR] Request failed: {error_type}: {error_msg}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return {
             'success': False,
-            'error': str(e),
-            'error_type': type(e).__name__
+            'error': error_msg,
+            'error_type': error_type
         }
 
 def main():
@@ -278,6 +269,7 @@ def main():
     try:
         # Read input from stdin
         input_data = json.loads(sys.stdin.read())
+        print(f"[DEBUG] Received request for: {input_data.get('method', 'GET')} {input_data.get('url', 'unknown')}", file=sys.stderr)
         
         # Make the request
         result = make_request(input_data)
@@ -286,7 +278,10 @@ def main():
         output = json.dumps(result, ensure_ascii=True)
         sys.stdout.write(output)
         sys.stdout.flush()
-        sys.exit(0)
+        
+        exit_code = 0 if result.get('success') else 1
+        print(f"[DEBUG] Exiting with code {exit_code}", file=sys.stderr)
+        sys.exit(exit_code)
         
     except json.JSONDecodeError as e:
         error_result = {
@@ -294,6 +289,7 @@ def main():
             'error': f'Invalid JSON input: {str(e)}',
             'error_type': 'JSONDecodeError'
         }
+        print(f"[ERROR] Invalid JSON input: {e}", file=sys.stderr)
         output = json.dumps(error_result, ensure_ascii=True)
         sys.stdout.write(output)
         sys.stdout.flush()
@@ -305,6 +301,9 @@ def main():
             'error': str(e),
             'error_type': type(e).__name__
         }
+        print(f"[ERROR] Unhandled exception: {type(e).__name__}: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         output = json.dumps(error_result, ensure_ascii=True)
         sys.stdout.write(output)
         sys.stdout.flush()

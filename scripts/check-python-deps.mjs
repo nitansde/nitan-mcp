@@ -22,9 +22,9 @@ try {
     const pythonVersion = execSync(`${pythonCmd} --version`, { encoding: 'utf-8' }).trim();
     console.log(`Found ${pythonVersion}`);
   } catch (error2) {
-    console.warn('Warning: Python not found. Cloudscraper features will not work.');
+    console.warn('Warning: Python not found. Cloudflare bypass features will not work.');
     console.warn('');
-    console.warn('To use cloudscraper for bypassing Cloudflare, please install Python:');
+    console.warn('To use cloudscraper/curl_cffi for bypassing Cloudflare, please install Python:');
     console.warn('  • Download Python 3.7+ from: https://www.python.org/downloads/');
     console.warn('  • On Windows: Make sure to check "Add Python to PATH" during installation');
     console.warn('  • On Mac: brew install python3');

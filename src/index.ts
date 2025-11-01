@@ -14,6 +14,7 @@ if (majorVersion < 18) {
 
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
+import { spawn } from "node:child_process";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -78,8 +79,9 @@ const ProfileSchema = z
       .describe("Maximum number of characters to include when returning post content (set via --max-read-length)"),
     transport: z.enum(["stdio", "http"]).optional().default("stdio").describe("Transport type: stdio (default) or http"),
     port: z.number().int().positive().optional().default(3000).describe("Port to listen on when using HTTP transport"),
-    use_cloudscraper: z.boolean().optional().default(true).describe("Use Python cloudscraper to bypass Cloudflare (enabled by default)"),
-    python_path: z.string().optional().default(process.platform === "win32" ? "python" : "python3").describe("Path to Python executable for cloudscraper"),
+    use_cloudscraper: z.boolean().optional().describe("(Deprecated: use bypass_method instead) Use Python cloudscraper to bypass Cloudflare"),
+    bypass_method: z.enum(["cloudscraper", "curl_cffi", "both"]).optional().default("both").describe("Cloudflare bypass method: 'cloudscraper', 'curl_cffi', or 'both' (default - tries cloudscraper with curl_cffi fallback)"),
+    python_path: z.string().optional().default(process.platform === "win32" ? "python" : "python3").describe("Path to Python executable for bypass methods"),
   })
   .strict();
 
@@ -188,7 +190,8 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
     max_read_length: (((flags.max_read_length ?? flags["max-read-length"]) as number | undefined) ?? profile.max_read_length ?? 50000) as number,
     transport: ((flags.transport as "stdio" | "http" | undefined) ?? profile.transport ?? "stdio") as "stdio" | "http",
     port: ((flags.port as number | undefined) ?? profile.port ?? 3000) as number,
-    use_cloudscraper: (((flags.use_cloudscraper ?? flags["use-cloudscraper"]) as boolean | undefined) ?? profile.use_cloudscraper ?? true) as boolean,
+    use_cloudscraper: (((flags.use_cloudscraper ?? flags["use-cloudscraper"]) as boolean | undefined) ?? profile.use_cloudscraper) as boolean | undefined,
+    bypass_method: (((flags.bypass_method ?? flags["bypass-method"]) as "cloudscraper" | "curl_cffi" | "both" | undefined) ?? profile.bypass_method ?? "both") as "cloudscraper" | "curl_cffi" | "both",
     python_path: (((flags.python_path ?? flags["python-path"]) as string | undefined) ?? profile.python_path ?? (process.platform === "win32" ? "python" : "python3")) as string,
   } satisfies Profile;
   
@@ -200,6 +203,69 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
 function buildAuth(_config: Profile): AuthMode {
   // Global default is no auth; use per-site overrides via auth_pairs when provided
   return { type: "none" };
+}
+
+/**
+ * Check Python dependencies at runtime
+ * Provides a warning if Python or required libraries are missing
+ */
+async function checkPythonDepsRuntime(logger: Logger, pythonPath: string): Promise<void> {
+  return new Promise((resolve) => {
+    // Quick check if Python and libraries are available
+    const checkScript = `
+import sys
+try:
+    import cloudscraper
+    import curl_cffi
+    print("OK")
+except ImportError as e:
+    print(f"MISSING:{e.name}")
+    sys.exit(1)
+`;
+    
+    const python = spawn(pythonPath, ["-c", checkScript]);
+    let output = "";
+    let errorOutput = "";
+    
+    python.stdout.on("data", (data) => {
+      output += data.toString();
+    });
+    
+    python.stderr.on("data", (data) => {
+      errorOutput += data.toString();
+    });
+    
+    python.on("close", (code) => {
+      if (code === 0 && output.includes("OK")) {
+        logger.debug("Python dependencies check: OK");
+        resolve();
+      } else {
+        // Dependencies are missing, show warning
+        logger.info("⚠️  Python dependencies not fully installed");
+        logger.info("   The server will start, but Cloudflare bypass features may not work.");
+        logger.info("");
+        logger.info("   To install dependencies, run:");
+        logger.info(`   ${pythonPath === "python" ? "pip" : "pip3"} install cloudscraper curl-cffi`);
+        logger.info("");
+        logger.info("   Or install from requirements.txt:");
+        logger.info(`   ${pythonPath === "python" ? "pip" : "pip3"} install -r requirements.txt`);
+        logger.info("");
+        resolve(); // Don't block server startup
+      }
+    });
+    
+    python.on("error", (err) => {
+      // Python not found
+      logger.info("⚠️  Python not found");
+      logger.info("   The server will start, but Cloudflare bypass features will not work.");
+      logger.info("");
+      logger.info("   To enable Cloudflare bypass:");
+      logger.info("   1. Install Python 3.7+ from https://python.org");
+      logger.info("   2. Install dependencies: pip3 install cloudscraper curl-cffi");
+      logger.info("");
+      resolve(); // Don't block server startup
+    });
+  });
 }
 
 async function main() {
@@ -234,6 +300,10 @@ async function main() {
   const config = mergeConfig(profile, argv);
 
   const logger = new Logger(config.log_level);
+  
+  // Check Python dependencies at runtime (in case postinstall didn't run)
+  await checkPythonDepsRuntime(logger, config.python_path);
+  
   const auth = buildAuth(config);
 
   // Meta log (stderr) without leaking secrets
@@ -258,7 +328,7 @@ async function main() {
     timeoutMs: config.timeout_ms,
     defaultAuth: auth,
     authOverrides,
-    useCloudscraper: config.use_cloudscraper,
+    bypassMethod: config.use_cloudscraper ? "both" : config.bypass_method, // Legacy support: use_cloudscraper=true => "both"
     pythonPath: config.python_path,
   });
 

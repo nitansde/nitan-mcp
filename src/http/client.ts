@@ -1,10 +1,13 @@
 import { Logger } from "../util/logger.js";
 import { CloudscraperClient } from "./cloudscraper.js";
+import { CurlCffiClient } from "./curl_cffi.js";
 
 export type AuthMode =
   | { type: "none" }
   | { type: "api_key"; key: string; username?: string }
   | { type: "user_api_key"; key: string; client_id?: string };
+
+export type BypassMethod = "cloudscraper" | "curl_cffi" | "both";
 
 export interface HttpClientOptions {
   baseUrl: string;
@@ -12,7 +15,8 @@ export interface HttpClientOptions {
   logger: Logger;
   auth: AuthMode;
   initialCookies?: string; // Cookie string in format "name1=value1; name2=value2"
-  useCloudscraper?: boolean; // Use Python cloudscraper to bypass Cloudflare
+  useCloudscraper?: boolean; // Use Python cloudscraper to bypass Cloudflare (deprecated, use bypassMethod)
+  bypassMethod?: BypassMethod; // Which bypass method to use: "cloudscraper", "curl_cffi", or "both" (fallback)
   pythonPath?: string; // Path to Python executable (default: "python3")
   loginCredentials?: {
     username: string;
@@ -36,6 +40,9 @@ export class HttpClient {
   private cookies = new Map<string, string>(); // Store cookies across requests
   private lastUrl: string | null = null; // Track last URL for Referer header
   private cloudscraperClient?: CloudscraperClient;
+  private curlCffiClient?: CurlCffiClient;
+  private bypassMethod: BypassMethod;
+  private cloudscraperFailed = false; // Track if cloudscraper has failed
 
   constructor(private opts: HttpClientOptions) {
     this.base = new URL(opts.baseUrl);
@@ -43,10 +50,30 @@ export class HttpClient {
     if (opts.initialCookies) {
       this.loadCookies(opts.initialCookies);
     }
-    // Initialize cloudscraper if enabled
-    if (opts.useCloudscraper) {
+    
+    // Determine bypass method (support legacy useCloudscraper option)
+    if (opts.bypassMethod) {
+      this.bypassMethod = opts.bypassMethod;
+    } else if (opts.useCloudscraper) {
+      // Legacy: if useCloudscraper is true, default to "both" for better reliability
+      this.bypassMethod = "both";
+    } else {
+      this.bypassMethod = "both"; // Default to both with fallback
+    }
+    
+    // Initialize bypass clients based on method
+    if (this.bypassMethod === "cloudscraper" || this.bypassMethod === "both") {
       this.cloudscraperClient = new CloudscraperClient(opts.logger, opts.pythonPath);
-      this.opts.logger.info("Cloudscraper enabled for bypassing Cloudflare");
+      this.opts.logger.info("Cloudscraper initialized for Cloudflare bypass");
+    }
+    if (this.bypassMethod === "curl_cffi" || this.bypassMethod === "both") {
+      this.curlCffiClient = new CurlCffiClient(opts.logger, opts.pythonPath);
+      this.opts.logger.info("curl_cffi initialized for Cloudflare bypass");
+    }
+    
+    // Log the active bypass strategy
+    if (this.bypassMethod === "both") {
+      this.opts.logger.info("Using dual bypass strategy: cloudscraper with curl_cffi fallback");
     }
   }
 
@@ -155,9 +182,9 @@ export class HttpClient {
       this.opts.logger.debug(`Request body: ${JSON.stringify(body, null, 2)}`);
     }
 
-    // Use cloudscraper if enabled
-    if (this.cloudscraperClient) {
-      return this.requestViaCloudscraper(method, url, headers, body);
+    // Use bypass method if configured
+    if (this.cloudscraperClient || this.curlCffiClient) {
+      return this.requestViaBypass(method, url, headers, body);
     }
 
     const controller = new AbortController();
@@ -246,13 +273,7 @@ export class HttpClient {
     }
   }
 
-  private async requestViaCloudscraper(method: string, url: string, headers: Record<string, string>, body?: unknown): Promise<any> {
-    if (!this.cloudscraperClient) {
-      throw new Error("Cloudscraper not initialized");
-    }
-
-    this.opts.logger.debug(`Using cloudscraper for ${method} ${url}`);
-
+  private async requestViaBypass(method: string, url: string, headers: Record<string, string>, body?: unknown): Promise<any> {
     // Convert cookies Map to object
     const cookiesObj: Record<string, string> = {};
     this.cookies.forEach((value, key) => {
@@ -260,65 +281,146 @@ export class HttpClient {
     });
 
     // Log cookies being sent
-    this.opts.logger.debug(`Sending ${Object.keys(cookiesObj).length} cookies to cloudscraper: ${Object.keys(cookiesObj).join(", ")}`);
+    this.opts.logger.debug(`Sending ${Object.keys(cookiesObj).length} cookies to bypass: ${Object.keys(cookiesObj).join(", ")}`);
 
-    try {
-      const requestData: any = {
-        url,
-        method,
-        headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-        cookies: cookiesObj,
-        timeout: Math.floor(this.opts.timeoutMs / 1000), // Convert to seconds
-      };
+    const requestData: any = {
+      url,
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      cookies: cookiesObj,
+      timeout: Math.floor(this.opts.timeoutMs / 1000), // Convert to seconds
+    };
 
-      // Add login credentials if provided
-      if (this.opts.loginCredentials) {
-        requestData.login = this.opts.loginCredentials;
-        this.opts.logger.debug(`Including login credentials for ${this.opts.loginCredentials.username}`);
-      }
-
-      const result = await this.cloudscraperClient.request(requestData);
-
-      if (!result.success) {
-        throw new Error(`Cloudscraper error: ${result.error} (${result.error_type})`);
-      }
-
-      this.opts.logger.debug(`Cloudscraper ${method} ${url} -> ${result.status}`);
-
-      // Store cookies from response
-      if (result.cookies) {
-        Object.entries(result.cookies).forEach(([key, value]) => {
-          this.cookies.set(key, value);
-          this.opts.logger.debug(`Stored cookie from cloudscraper: ${key}`);
-        });
-      }
-
-      // Update last URL for Referer header
-      this.lastUrl = url;
-
-      // Check for HTTP errors
-      if (result.status && result.status >= 400) {
-        const errorBody = safeJson(result.body || "");
-        this.opts.logger.error(`HTTP ${result.status} for ${method} ${url}: ${result.body}`);
-        throw new HttpError(result.status, `HTTP ${result.status}`, errorBody);
-      }
-
-      // Parse response body
-      const contentType = result.headers?.["content-type"] || result.headers?.["Content-Type"] || "";
-      if (contentType.includes("application/json")) {
-        return JSON.parse(result.body || "{}");
-      } else {
-        return result.body;
-      }
-    } catch (e: any) {
-      if (e instanceof HttpError) {
-        throw e;
-      }
-      const errorMsg = `Cloudscraper request failed: ${e.message}`;
-      this.opts.logger.error(errorMsg);
-      throw new Error(errorMsg);
+    // Add login credentials if provided
+    if (this.opts.loginCredentials) {
+      requestData.login = this.opts.loginCredentials;
+      this.opts.logger.debug(`Including login credentials for ${this.opts.loginCredentials.username}`);
     }
+
+    // Strategy: Try cloudscraper first (if available), fallback to curl_cffi
+    let lastError: Error | null = null;
+    
+    // Try cloudscraper if available and not previously failed (or if it's the only option)
+    if (this.cloudscraperClient && (this.bypassMethod === "cloudscraper" || !this.cloudscraperFailed)) {
+      try {
+        this.opts.logger.debug(`Using cloudscraper for ${method} ${url}`);
+        const result = await this.cloudscraperClient.request(requestData);
+
+        if (!result.success) {
+          throw new Error(`Cloudscraper error: ${result.error} (${result.error_type})`);
+        }
+
+        this.opts.logger.debug(`Cloudscraper ${method} ${url} -> ${result.status}`);
+
+        // Store cookies from response
+        if (result.cookies) {
+          Object.entries(result.cookies).forEach(([key, value]) => {
+            this.cookies.set(key, value);
+            this.opts.logger.debug(`Stored cookie from cloudscraper: ${key}`);
+          });
+        }
+
+        // Update last URL for Referer header
+        this.lastUrl = url;
+
+        // Check for HTTP errors
+        if (result.status && result.status >= 400) {
+          const errorBody = safeJson(result.body || "");
+          this.opts.logger.error(`HTTP ${result.status} for ${method} ${url}: ${result.body}`);
+          throw new HttpError(result.status, `HTTP ${result.status}`, errorBody);
+        }
+
+        // Parse response body
+        const contentType = result.headers?.["content-type"] || result.headers?.["Content-Type"] || "";
+        if (contentType.includes("application/json")) {
+          return JSON.parse(result.body || "{}");
+        } else {
+          return result.body;
+        }
+      } catch (e: any) {
+        if (e instanceof HttpError) {
+          throw e; // Don't fallback on HTTP errors (4xx, 5xx)
+        }
+        
+        lastError = e;
+        this.opts.logger.info(`Cloudscraper failed: ${e.message}`);
+        
+        // Mark cloudscraper as failed if we're in dual mode
+        if (this.bypassMethod === "both") {
+          this.cloudscraperFailed = true;
+          this.opts.logger.info("Marking cloudscraper as failed, will use curl_cffi for future requests");
+        }
+        
+        // If we're in cloudscraper-only mode, throw the error
+        if (this.bypassMethod === "cloudscraper") {
+          const errorMsg = `Cloudscraper request failed: ${e.message}`;
+          this.opts.logger.error(errorMsg);
+          throw new Error(errorMsg);
+        }
+        
+        // Otherwise fall through to try curl_cffi
+        this.opts.logger.info("Falling back to curl_cffi...");
+      }
+    }
+    
+    // Try curl_cffi if available
+    if (this.curlCffiClient) {
+      try {
+        this.opts.logger.debug(`Using curl_cffi for ${method} ${url}`);
+        const result = await this.curlCffiClient.request(requestData);
+
+        if (!result.success) {
+          throw new Error(`curl_cffi error: ${result.error} (${result.error_type})`);
+        }
+
+        this.opts.logger.debug(`curl_cffi ${method} ${url} -> ${result.status}`);
+
+        // Store cookies from response
+        if (result.cookies) {
+          Object.entries(result.cookies).forEach(([key, value]) => {
+            this.cookies.set(key, value);
+            this.opts.logger.debug(`Stored cookie from curl_cffi: ${key}`);
+          });
+        }
+
+        // Update last URL for Referer header
+        this.lastUrl = url;
+
+        // Check for HTTP errors
+        if (result.status && result.status >= 400) {
+          const errorBody = safeJson(result.body || "");
+          this.opts.logger.error(`HTTP ${result.status} for ${method} ${url}: ${result.body}`);
+          throw new HttpError(result.status, `HTTP ${result.status}`, errorBody);
+        }
+
+        // Parse response body
+        const contentType = result.headers?.["content-type"] || result.headers?.["Content-Type"] || "";
+        if (contentType.includes("application/json")) {
+          return JSON.parse(result.body || "{}");
+        } else {
+          return result.body;
+        }
+      } catch (e: any) {
+        if (e instanceof HttpError) {
+          throw e; // Don't retry on HTTP errors
+        }
+        
+        const errorMsg = `curl_cffi request failed: ${e.message}`;
+        this.opts.logger.error(errorMsg);
+        
+        // If we had a previous cloudscraper error, mention both
+        if (lastError) {
+          this.opts.logger.error(`Both bypass methods failed. Cloudscraper: ${lastError.message}, curl_cffi: ${e.message}`);
+          throw new Error(`Both bypass methods failed. Last error: ${e.message}`);
+        }
+        
+        throw new Error(errorMsg);
+      }
+    }
+    
+    // This should never happen if configuration is correct
+    throw new Error("No bypass method available");
   }
 }
 

@@ -1,5 +1,5 @@
 import type { Logger } from "../util/logger.js";
-import { HttpClient, type AuthMode } from "../http/client.js";
+import { HttpClient, type AuthMode, type BypassMethod } from "../http/client.js";
 
 export type AuthOverride = {
   site: string; // base URL or origin to match
@@ -32,7 +32,8 @@ export class SiteState {
       timeoutMs: number;
       defaultAuth: AuthMode;
       authOverrides?: AuthOverride[];
-      useCloudscraper?: boolean;
+      bypassMethod?: BypassMethod;
+      useCloudscraper?: boolean; // Deprecated, use bypassMethod instead
       pythonPath?: string;
     }
   ) {}
@@ -56,13 +57,21 @@ export class SiteState {
     const auth = this.resolveAuthForSite(base);
     const cookies = this.resolveCookiesForSite(base);
     const loginCreds = this.resolveLoginForSite(base);
+    
+    // Determine bypass method (support legacy useCloudscraper option)
+    let bypassMethod: BypassMethod | undefined = this.opts.bypassMethod;
+    if (bypassMethod === undefined && this.opts.useCloudscraper !== undefined) {
+      // Legacy support: useCloudscraper=true => "both" for better reliability
+      bypassMethod = this.opts.useCloudscraper ? "both" : undefined;
+    }
+    
     const client = new HttpClient({
       baseUrl: base,
       timeoutMs: this.opts.timeoutMs,
       logger: this.opts.logger,
       auth,
       initialCookies: cookies,
-      useCloudscraper: this.opts.useCloudscraper,
+      bypassMethod,
       pythonPath: this.opts.pythonPath,
       loginCredentials: loginCreds,
     } as any);
