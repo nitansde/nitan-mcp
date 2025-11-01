@@ -28,16 +28,28 @@ def get_session(base_url: str) -> requests.Session:
     
     # Create new session if URL changed or doesn't exist
     if _session_instance is None or _base_url != base_url:
-        # Use chrome120 impersonation for best Cloudflare bypass
-        _session_instance = requests.Session(impersonate="chrome120")
+        # Use chrome110 impersonation for better Cloudflare compatibility on datacenter IPs
+        _session_instance = requests.Session(impersonate="chrome110")
         _base_url = base_url
         
-        # Warm up session with base URL
+        # Warm up session with base URL to establish Cloudflare cookies
+        # This is critical for datacenter/cloud IPs that trigger Cloudflare challenges
         try:
-            _session_instance.get(base_url, timeout=10, allow_redirects=True)
-            print(f"[DEBUG] Warmed up session for {base_url}", file=sys.stderr)
+            print(f"[DEBUG] Warming up session for {base_url} (critical for cloud IPs)...", file=sys.stderr)
+            warmup_response = _session_instance.get(base_url, timeout=15, allow_redirects=True)
+            print(f"[DEBUG] Warmup response status: {warmup_response.status_code}", file=sys.stderr)
+            
+            # Check if we got Cloudflare cookies
+            cf_cookies = [k for k in _session_instance.cookies.keys() if k.startswith('cf_') or k.startswith('__cf')]
+            if cf_cookies:
+                print(f"[DEBUG] Obtained Cloudflare cookies: {cf_cookies}", file=sys.stderr)
+            else:
+                print(f"[DEBUG] No Cloudflare cookies yet (may be added on next request)", file=sys.stderr)
+                
         except Exception as e:
-            print(f"[DEBUG] Session warm-up failed (non-critical): {e}", file=sys.stderr)
+            print(f"[WARNING] Session warm-up failed: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
     
     return _session_instance
 
@@ -164,11 +176,17 @@ def make_request(data: Dict) -> Dict:
         session.cookies.update(data['cookies'])
         print(f"[DEBUG] Applied {len(data['cookies'])} cookies: {list(data['cookies'].keys())}", file=sys.stderr)
     
+    # Check if this is a public endpoint that doesn't need authentication
+    # Skipping login for these improves reliability on cloud IPs
+    public_endpoints = ['/about.json', '/site.json', '/categories.json', '/tags.json', '/latest.json']
+    is_public_endpoint = any(url.endswith(endpoint) or endpoint in url for endpoint in public_endpoints)
+    
     # Only attempt login if:
     # 1. Login credentials are provided AND
-    # 2. We don't have a session cookie yet
+    # 2. We don't have a session cookie yet AND
+    # 3. This is NOT a public endpoint
     should_login = False
-    if data.get('login'):
+    if data.get('login') and not is_public_endpoint:
         login_info = data['login']
         username = login_info.get('username')
         password = login_info.get('password')
@@ -197,10 +215,14 @@ def make_request(data: Dict) -> Dict:
             second_factor = login_info.get('second_factor_token')
             login_result = login(session, base_url, username, password, second_factor)
             if not login_result.get('success'):
-                return login_result
-            print(f"[DEBUG] Login completed successfully", file=sys.stderr)
+                # Don't fail the entire request if login fails - might still work for public content
+                print(f"[WARNING] Login failed but continuing with request: {login_result.get('error')}", file=sys.stderr)
+            else:
+                print(f"[DEBUG] Login completed successfully", file=sys.stderr)
         elif has_session:
             print(f"[DEBUG] Session exists, skipping login", file=sys.stderr)
+    elif is_public_endpoint and data.get('login'):
+        print(f"[DEBUG] Skipping login for public endpoint: {url}", file=sys.stderr)
     
     try:
         # Make the request
