@@ -560,3 +560,10 @@ Use the `categories` parameter with natural language names instead of query toke
   "limit": 15
 }
 ```
+
+### Get Funny Topics
+```json
+{
+  "limit": 15
+}
+```

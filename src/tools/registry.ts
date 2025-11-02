@@ -18,6 +18,7 @@ import { registerListHotTopics } from "./builtin/list_hot_topics.js";
 import { registerListNotifications } from "./builtin/list_notifications.js";
 import { registerListTopTopics } from "./builtin/list_top_topics.js";
 import { registerListExcellentTopics } from "./builtin/list_excellent_topics.js";
+import { registerListFunnyTopics } from "./builtin/list_funny_topics.js";
 
 export type ToolsMode = "auto" | "discourse_api_only" | "tool_exec_api";
 
@@ -53,6 +54,7 @@ export async function registerAllTools(
   registerListNotifications(server, ctx, { allowWrites: false });
   registerListTopTopics(server, ctx, { allowWrites: false });
   registerListExcellentTopics(server, ctx, { allowWrites: false });
+  registerListFunnyTopics(server, ctx, { allowWrites: false });
   // registerFilterTopics(server, ctx, { allowWrites: false });
   registerCreatePost(server, ctx, { allowWrites: opts.allowWrites });
   registerCreateUser(server, ctx, { allowWrites: opts.allowWrites });
