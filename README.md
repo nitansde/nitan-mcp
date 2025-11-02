@@ -2,7 +2,7 @@
 
 [论坛开发讨论贴](https://www.uscardforum.com/t/topic/450599)
 
-This is a modified version of Discourse MCP. It will be a dedicated MCP client for https://www.uscardforum.com/
+This is a heavy modified version of [Discourse MCP](https://github.com/discourse/discourse-mcp). It will be a dedicated MCP client for https://www.uscardforum.com/
 
 ### Quick Installation
 
@@ -87,6 +87,8 @@ Use optinal env `"TIME_ZONE": "America/New_York"` if you want to use a timezone 
 **Configuration file location:**
 - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+```
+
 
 ## Original README
 [Discourse MCP](https://github.com/discourse/discourse-mcp/blob/main/README.md)

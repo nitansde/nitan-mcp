@@ -1,11 +1,136 @@
-# Nitan MCP Custom Tools Reference
+# Nitan MCP Tools Reference
 
-This document describes the custom tools added to this fork for uscardforum.com.
+This document describes the tools available in this Discourse MCP server, including both standard Discourse API tools and custom enhancements for uscardforum.com.
 
-## New Tools
+## Core Discourse Tools
 
-### 1. list_hot_topics
-Returns hot topics from the forum.
+### discourse_search
+Search site content with optional sorting.
+
+**Input:**
+```json
+{
+  "query": "credit card rewards",
+  "with_private": false,  // Optional: include private messages (requires auth)
+  "max_results": 10       // Optional: 1-50, default 10
+}
+```
+
+**Output:**
+- List of matching topics with titles and URLs
+- JSON footer with structured data
+
+---
+
+### discourse_read_topic
+Read a topic's metadata and posts. Can optionally filter to show only posts from a specific user.
+
+**Input:**
+```json
+{
+  "topic_id": 12345,
+  "post_limit": 5,          // Optional: 1-20, default 5
+  "start_post_number": 1,   // Optional: start from specific post
+  "username": "john_doe"    // Optional: filter to posts by this user only
+}
+```
+
+**Output:**
+- Topic title, category, tags
+- Posts with author, timestamp, and content
+- Canonical topic link
+
+---
+
+### discourse_read_post
+Read a single post by ID.
+
+**Input:**
+```json
+{
+  "post_id": 67890
+}
+```
+
+**Output:**
+- Author, timestamp, content
+- Direct link to the post
+
+---
+
+### discourse_get_user
+Get user profile information.
+
+**Input:**
+```json
+{
+  "username": "john_doe"
+}
+```
+
+**Output:**
+- Display name, trust level, joined date
+- Short bio and profile link
+
+---
+
+### discourse_get_user_activity
+Get a list of user posts and replies from a Discourse instance, with the most recent first. Returns 30 posts per page by default.
+
+**Input:**
+```json
+{
+  "username": "john_doe",
+  "page": 0  // Optional: page 0 = offset 0, page 1 = offset 30, etc.
+}
+```
+
+**Output:**
+- List of user's recent posts and replies
+- Post content, topic titles, and links
+- Pagination information
+
+---
+
+### discourse_filter_topics
+Filter topics with natural language category names and advanced query syntax.
+
+**Input:**
+```json
+{
+  "filter": "status:open order:latest",
+  "categories": ["Chase Credit Cards", "American Express"],  // Optional: natural language names
+  "page": 1,
+  "per_page": 20
+}
+```
+
+**Output:**
+- Paginated topic list with titles and URLs
+- JSON footer with pagination info
+
+See [Query Language Reference](#query-language-reference) below for filter syntax.
+
+---
+
+### discourse_list_tags
+List all available tags on the site.
+
+**Input:**
+```json
+{}
+```
+
+**Output:**
+- List of tags with usage counts
+- Notice if tags are disabled on the site
+
+---
+
+## Custom Enhanced Tools
+
+### 1. discourse_list_hot_topics
+Get the current hot/trending topics from the forum. Hot topics are based on recent activity, views, and engagement.
 
 **Input:**
 ```json
@@ -27,8 +152,8 @@ Returns hot topics from the forum.
 
 ---
 
-### 2. list_notifications
-Returns user notifications (requires authentication).
+### 2. discourse_list_notifications
+Get user notifications from the forum. Requires authentication with user credentials.
 
 **Input:**
 ```json
@@ -52,8 +177,8 @@ Returns user notifications (requires authentication).
 
 ---
 
-### 3. list_top_topics
-Returns top topics for a specific time period.
+### 3. discourse_list_top_topics
+Get the top topics from the forum for a specific time period (daily, weekly, monthly, quarterly, yearly, or all time). Top topics are ranked by activity, views, and engagement.
 
 **Input:**
 ```json
@@ -77,18 +202,87 @@ Returns top topics for a specific time period.
 
 ---
 
-### 4. filter_topics (Enhanced)
-Filter topics with natural language category names.
+## Write Operations (Authentication Required)
+
+### discourse_create_post
+Create a new post (reply) in an existing topic.
 
 **Input:**
 ```json
 {
-  "filter": "status:open order:latest",
-  "categories": ["Chase Credit Cards", "American Express"],  // Optional: natural language names
-  "page": 1,
-  "per_page": 20
+  "topic_id": 12345,
+  "raw": "This is my reply to the topic..."
 }
 ```
+
+**Output:**
+- Link to the created post
+- Rate limited to ~1 request/second
+
+---
+
+### discourse_create_topic
+Create a new topic.
+
+**Input:**
+```json
+{
+  "title": "My New Topic Title",
+  "raw": "This is the content of my topic...",
+  "category_id": 3,        // Optional: category ID
+  "tags": ["question", "beginner"]  // Optional: topic tags
+}
+```
+
+**Output:**
+- Link to the created topic
+- Rate limited to ~1 request/second
+
+---
+
+### discourse_create_category
+Create a new category (admin/moderator only).
+
+**Input:**
+```json
+{
+  "name": "New Category",
+  "color": "0088CC",              // Optional: hex color
+  "text_color": "FFFFFF",         // Optional: hex text color
+  "parent_category_id": 5,        // Optional: parent category
+  "description": "Category description..."  // Optional
+}
+```
+
+**Output:**
+- Link to the created category
+- Rate limited to ~1 request/second
+
+---
+
+### discourse_create_user
+Create a new user account (admin only).
+
+**Input:**
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "securepassword",
+  "username": "john_doe",
+  "active": true  // Optional: activate immediately
+}
+```
+
+**Output:**
+- User profile link
+- Rate limited to ~1 request/second
+
+---
+
+## Enhanced Category Support
+
+The `discourse_filter_topics` tool now supports natural language category names.
 
 **Category Support:**
 - Accepts natural language category names (e.g., "Chase Credit Cards")
@@ -167,13 +361,25 @@ See `src/tools/categories.ts` for the complete mapping.
 
 ---
 
-## Disabled Tools
+## Tool Availability
 
-### list_categories
-This tool has been **disabled** because:
+### Authentication-Required Tools
+These tools require authentication via `--username` and `--password`:
+- `discourse_list_notifications`
+- `discourse_get_user_activity` (for private content)
+- All write operations (create_post, create_topic, etc.)
+
+### Write Operations
+Write tools are only available when:
+1. `--allow-writes` flag is set AND
+2. `--read-only` is false (or not set) AND
+3. Authentication is configured via `--auth-pairs` or username/password
+
+### Disabled Tools
+The `discourse_list_categories` tool has been **disabled** because:
 1. Category list was too long and not useful in MCP context
 2. Replaced with hardcoded category mapping
-3. Category names are now accepted directly in `filter_topics`
+3. Category names are now accepted directly in `discourse_filter_topics`
 
 If you need to see all categories, refer to `src/tools/categories.ts` or use the web interface.
 
@@ -195,24 +401,45 @@ nitan-mcp \
 
 ## Cloudflare Bypass
 
-This fork includes automatic Cloudflare bypass using Python cloudscraper:
+This fork includes automatic Cloudflare bypass with two methods:
+
+1. **cloudscraper** - Traditional Python cloudscraper library
+2. **curl_cffi** - Modern curl-impersonate library (faster and more reliable)
+3. **both** (default) - Tries cloudscraper first, falls back to curl_cffi
 
 ```bash
-# Enable cloudscraper
-nitan-mcp --use_cloudscraper
+# Use default (both methods with fallback)
+nitan-mcp
+
+# Use curl_cffi only (recommended for best performance)
+nitan-mcp --bypass-method curl_cffi
+
+# Use cloudscraper only
+nitan-mcp --bypass-method cloudscraper
 
 # Specify Python path if needed
-nitan-mcp --use_cloudscraper --python_path /usr/local/bin/python3
+nitan-mcp --bypass-method both --python-path /usr/local/bin/python3
 
 # Increase timeout for slow responses
-nitan-mcp --use_cloudscraper --timeout_ms 30000
+nitan-mcp --bypass-method both --timeout-ms 30000
+
+# Legacy flag (still supported, equivalent to --bypass-method both)
+nitan-mcp --use-cloudscraper
 ```
 
 **Requirements:**
 - Python 3.7+
-- `pip3 install cloudscraper`
+- `pip3 install cloudscraper curl-cffi`
 
-The postinstall script attempts to install cloudscraper automatically.
+Or install all requirements:
+```bash
+pip3 install -r requirements.txt
+```
+
+The postinstall script attempts to install these dependencies automatically.
+
+**Error Messages:**
+If Python or dependencies are missing, you'll see bilingual error messages (English and Chinese) with instructions on how to install the required packages.
 
 ---
 
