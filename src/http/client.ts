@@ -14,7 +14,6 @@ export interface HttpClientOptions {
   timeoutMs: number;
   logger: Logger;
   auth: AuthMode;
-  initialCookies?: string; // Cookie string in format "name1=value1; name2=value2"
   useCloudscraper?: boolean; // Use Python cloudscraper to bypass Cloudflare (deprecated, use bypassMethod)
   bypassMethod?: BypassMethod; // Which bypass method to use: "cloudscraper", "curl_cffi", or "both" (fallback)
   pythonPath?: string; // Path to Python executable (default: "python3")
@@ -46,10 +45,6 @@ export class HttpClient {
 
   constructor(private opts: HttpClientOptions) {
     this.base = new URL(opts.baseUrl);
-    // Load initial cookies if provided
-    if (opts.initialCookies) {
-      this.loadCookies(opts.initialCookies);
-    }
     
     // Determine bypass method (support legacy useCloudscraper option)
     if (opts.bypassMethod) {
@@ -117,19 +112,6 @@ export class HttpClient {
       if (this.opts.auth.client_id) h["User-Api-Client-Id"] = this.opts.auth.client_id;
     }
     return h;
-  }
-
-  private loadCookies(cookieString: string) {
-    // Parse cookie string in format "name1=value1; name2=value2"
-    const pairs = cookieString.split(";");
-    for (const pair of pairs) {
-      const [name, ...valueParts] = pair.split("=");
-      if (name && valueParts.length > 0) {
-        const value = valueParts.join("=");
-        this.cookies.set(name.trim(), value.trim());
-        this.opts.logger.debug(`Loaded initial cookie: ${name.trim()}`);
-      }
-    }
   }
 
   private parseCookies(setCookieHeader: string) {

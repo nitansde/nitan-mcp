@@ -389,6 +389,4 @@ Note: `use_cloudscraper: true` still works but is deprecated. It now defaults to
 
 ## See Also
 
-- [CLOUDSCRAPER_GUIDE.md](CLOUDSCRAPER_GUIDE.md) - Detailed cloudscraper documentation
-- [COOKIE_USAGE.md](COOKIE_USAGE.md) - Manual cookie configuration
 - [README.md](README.md) - Main project documentation
