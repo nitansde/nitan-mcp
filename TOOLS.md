@@ -202,6 +202,44 @@ Get the top topics from the forum for a specific time period (daily, weekly, mon
 
 ---
 
+### 4. discourse_list_excellent_topics
+Get recent excellent topics from the forum. An excellent topic is a topic with over 50 likes that earned the "精彩的话题" (Excellent Topic) badge.
+
+**Input:**
+```json
+{
+  "limit": 10  // Optional: 1-50, default 10
+}
+```
+
+**Output:**
+- List of recent excellent topics with structured JSON data
+- Each entry includes: topic ID, username of author, title, post count, and when it achieved excellence
+
+**Example:**
+```json
+{
+  "limit": 20
+}
+```
+
+**Output format:**
+```json
+{
+  "results": [
+    {
+      "id": 452676,
+      "username": "leena",
+      "title": "体会到了"他乡遇故知"是一件多么美好的事情！",
+      "posts_count": 21,
+      "granted_at": "2025-11-02T21:16:19.542Z"
+    }
+  ]
+}
+```
+
+---
+
 ## Write Operations (Authentication Required)
 
 ### discourse_create_post
@@ -513,5 +551,12 @@ Use the `categories` parameter with natural language names instead of query toke
 ```json
 {
   "limit": 25
+}
+```
+
+### Get Excellent Topics (50+ likes)
+```json
+{
+  "limit": 15
 }
 ```
