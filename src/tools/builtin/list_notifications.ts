@@ -128,6 +128,19 @@ export const registerListNotifications: RegisterFn = (server, ctx) => {
         const text = JSON.stringify(jsonOutput, null, 2);
         return { content: [{ type: "text", text }] };
       } catch (e: any) {
+        // Check if this is a "not logged in" error (403 with not_logged_in error_type)
+        if (e?.status === 403 || (e?.message && (e.message.includes("not_logged_in") || e.message.includes("您需要登录")))) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: "Unable to fetch notifications: User is not logged in. Notifications require authentication with username and password.",
+              },
+            ],
+            isError: true,
+          };
+        }
+        
         return {
           content: [
             {
