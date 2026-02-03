@@ -92,17 +92,104 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
           category = metaData?.category_id ? `Category ID ${metaData.category_id}` : "";
           tags = Array.isArray(metaData?.tags) ? metaData.tags : [];
           slug = metaData?.slug || String(topic_id);
-          
-          // Calculate which page to start from based on start_post_number
-          // Assuming ~100 posts per page
+
+          // Constants for pagination
           const postsPerPage = 100;
-          let currentPage = Math.floor((start_post_number - 1) / postsPerPage) + 1;
-          
-          // Fetch raw content pages
+          const maxPages = 101;
+          const maxWalkSteps = 10; // 5% of 101 pages ≈ 5, use 10 for safety margin
+
+          // Helper: extract all post numbers from raw page text
+          const extractPostNumbers = (rawText: string): number[] => {
+            const numbers: number[] = [];
+            const headerRegex = /^.+?\s*\|\s*.+?\s*\|\s*#(\d+)\s*$/gm;
+            let match;
+            while ((match = headerRegex.exec(rawText)) !== null) {
+              numbers.push(parseInt(match[1], 10));
+            }
+            return numbers;
+          };
+
+          // Phase 1: Estimate starting page using deletion ratio
+          const postsCount = metaData?.posts_count || 0;
+          const highestPostNumber = metaData?.highest_post_number || postsCount;
+          const deletionRatio = (postsCount > 0 && highestPostNumber > 0)
+            ? postsCount / highestPostNumber
+            : 1;
+
+          // Estimate stream position and calculate page
+          const estimatedPosition = Math.max(1, Math.floor(start_post_number * deletionRatio));
+          let currentPage = Math.min(maxPages, Math.max(1, Math.floor((estimatedPosition - 1) / postsPerPage) + 1));
+
+          // Phase 2: Walk to find the correct page containing start_post_number
+          // We need to find a page where minPostNumber <= start_post_number
+          let walkSteps = 0;
+          let cachedPageText: string | null = null; // Cache the last fetched page to avoid re-fetching
+          while (walkSteps < maxWalkSteps) {
+            const probeUrl = `/raw/${topic_id}?page=${currentPage}`;
+            const probeText = (await client.get(probeUrl)) as string;
+            cachedPageText = probeText; // Cache for potential reuse
+
+            if (!probeText || probeText.trim().length === 0) {
+              // Empty page - if we're looking for posts, go backward
+              if (currentPage > 1) {
+                currentPage--;
+                walkSteps++;
+                continue;
+              }
+              break; // Page 1 is empty, topic has no posts
+            }
+
+            const postNumbers = extractPostNumbers(probeText);
+            if (postNumbers.length === 0) {
+              // No posts parsed, try going backward
+              if (currentPage > 1) {
+                currentPage--;
+                walkSteps++;
+                continue;
+              }
+              break;
+            }
+
+            const minPostNumber = Math.min(...postNumbers);
+            const maxPostNumber = Math.max(...postNumbers);
+
+            if (minPostNumber > start_post_number) {
+              // Overshot - all posts on this page are after our target, go backward
+              if (currentPage > 1) {
+                currentPage--;
+                walkSteps++;
+                continue;
+              }
+              break; // Already at page 1, start here
+            }
+
+            if (maxPostNumber < start_post_number) {
+              // Undershot - all posts on this page are before our target, go forward
+              if (currentPage < maxPages) {
+                currentPage++;
+                walkSteps++;
+                continue;
+              }
+              break; // Already at max page
+            }
+
+            // Page contains posts around our target (minPostNumber <= start <= maxPostNumber)
+            // or at least has some posts >= start_post_number
+            break;
+          }
+
+          // Fetch raw content pages starting from the found page
           while (fetchedPosts.length < post_limit) {
-            const rawUrl = `/raw/${topic_id}?page=${currentPage}`;
-            const rawText = (await client.get(rawUrl)) as string;
-            
+            // Use cached page from walk phase if available, otherwise fetch
+            let rawText: string;
+            if (cachedPageText !== null) {
+              rawText = cachedPageText;
+              cachedPageText = null; // Clear cache after use
+            } else {
+              const rawUrl = `/raw/${topic_id}?page=${currentPage}`;
+              rawText = (await client.get(rawUrl)) as string;
+            }
+
             if (!rawText || rawText.trim().length === 0) break; // No more content
             
             // Parse the raw text format: "username | timestamp | #post_number\n\ncontent\n\n-------------------------\n\n"

@@ -7,7 +7,7 @@ export type AuthMode =
   | { type: "api_key"; key: string; username?: string }
   | { type: "user_api_key"; key: string; client_id?: string };
 
-export type BypassMethod = "cloudscraper" | "curl_cffi" | "both";
+export type BypassMethod = "cloudscraper" | "curl_cffi" | "both" | "none";
 
 export interface HttpClientOptions {
   baseUrl: string;
@@ -56,19 +56,23 @@ export class HttpClient {
       this.bypassMethod = "both"; // Default to both with fallback
     }
     
-    // Initialize bypass clients based on method
-    if (this.bypassMethod === "cloudscraper" || this.bypassMethod === "both") {
-      this.cloudscraperClient = new CloudscraperClient(opts.logger, opts.pythonPath);
-      this.opts.logger.info("Cloudscraper initialized for Cloudflare bypass");
-    }
-    if (this.bypassMethod === "curl_cffi" || this.bypassMethod === "both") {
-      this.curlCffiClient = new CurlCffiClient(opts.logger, opts.pythonPath);
-      this.opts.logger.info("curl_cffi initialized for Cloudflare bypass");
-    }
-    
-    // Log the active bypass strategy
-    if (this.bypassMethod === "both") {
-      this.opts.logger.info("Using dual bypass strategy: cloudscraper with curl_cffi fallback");
+    // Initialize bypass clients based on method (skip for "none" to use native fetch)
+    if (this.bypassMethod !== "none") {
+      if (this.bypassMethod === "cloudscraper" || this.bypassMethod === "both") {
+        this.cloudscraperClient = new CloudscraperClient(opts.logger, opts.pythonPath);
+        this.opts.logger.info("Cloudscraper initialized for Cloudflare bypass");
+      }
+      if (this.bypassMethod === "curl_cffi" || this.bypassMethod === "both") {
+        this.curlCffiClient = new CurlCffiClient(opts.logger, opts.pythonPath);
+        this.opts.logger.info("curl_cffi initialized for Cloudflare bypass");
+      }
+
+      // Log the active bypass strategy
+      if (this.bypassMethod === "both") {
+        this.opts.logger.info("Using dual bypass strategy: cloudscraper with curl_cffi fallback");
+      }
+    } else {
+      this.opts.logger.info("Bypass disabled, using native fetch");
     }
   }
 
