@@ -1,5 +1,6 @@
 import type { Logger } from "../util/logger.js";
 import { HttpClient, type AuthMode, type BypassMethod } from "../http/client.js";
+import type { BrowserFallbackOptions } from "../http/browser_fallback.js";
 
 export type AuthOverride = {
   site: string; // base URL or origin to match
@@ -34,6 +35,7 @@ export class SiteState {
       bypassMethod?: BypassMethod;
       useCloudscraper?: boolean; // Deprecated, use bypassMethod instead
       pythonPath?: string;
+      browserFallback?: BrowserFallbackOptions;
     }
   ) {}
 
@@ -71,6 +73,7 @@ export class SiteState {
       bypassMethod,
       pythonPath: this.opts.pythonPath,
       loginCredentials: loginCreds,
+      browserFallback: this.opts.browserFallback,
     } as any);
     this.clientCache.set(base, client);
     return { base, client };

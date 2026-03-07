@@ -11,11 +11,19 @@ Use this skill as a thin bridge to the existing MCP server. Do not reimplement f
 
 1. Confirm Node.js >= 18.
 2. Confirm Python 3.7+ is installed.
-3. Install Python deps if Cloudflare bypass is needed:
-   - `pip3 install cloudscraper curl-cffi`
-4. Use one of these launch forms:
+3. On macOS, `npm install` auto-installs `playwright` and Chromium runtime for browser fallback.
+4. On non-macOS, Playwright is not auto-installed.
+5. Use Python venv for dependencies (recommended on all platforms):
+   - macOS/Linux: `python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt`
+   - Windows (PowerShell): `py -3 -m venv .venv; .\.venv\Scripts\Activate.ps1; pip install -r requirements.txt`
+6. Install Python deps with venv Python if needed:
+   - macOS/Linux: `.venv/bin/python -m pip install -r requirements.txt`
+   - Windows: `.venv\Scripts\python.exe -m pip install -r requirements.txt`
+7. Use one of these launch forms:
    - `npx -y @nitansde/mcp@latest`
    - `node dist/index.js` (inside this repo)
+8. Run environment self-check:
+   - `node dist/index.js doctor`
 
 ## MCP client config (Claude Desktop example)
 
@@ -45,8 +53,33 @@ Use this shape.
 - Enable writes only when explicitly requested and credentials are configured.
 - If user asks for site switching, use `discourse_select_site` unless server is tethered with `--site`.
 
+## Browser fallback (Cloudflare challenge)
+
+- Default behavior stays the same: direct mode first.
+- On macOS, browser fallback is enabled by default and should trigger only on Cloudflare challenge-like responses.
+- On macOS, default fallback provider is `playwright` (persistent profile mode).
+- On macOS, install flow auto-installs Playwright package + Chromium runtime.
+- Playwright profile selection on macOS:
+  - Prefer OpenClaw user-data-dir only when the selected profile directory exists.
+  - Otherwise use/create `~/Library/Application Support/NitanMCP/ChromeProfile`.
+  - If OpenClaw user-data-dir exists but selected profile directory is missing, auto-fallback to Nitan profile dir.
+  - Never use system default Chrome profile directory.
+- On **macOS**, interactive login flow is allowed: bring up a visible Chrome profile and ask user to login.
+- On non-macOS, browser fallback is disabled automatically. Do **not** attempt GUI bring-up, and Playwright is not auto-installed.
+
+Useful flags:
+- `--browser-fallback-enabled=true`
+- `--browser-fallback-provider=playwright`
+- `--interactive-login-enabled=true`
+- `--login-profile-name="Default"`
+
+Note:
+- If provider is switched to `openclaw_proxy` and relay tab is unavailable, attach OpenClaw Browser Relay tab first (badge should be `ON`).
+
 ## Troubleshooting
 
 - If startup warns about missing Python deps, install from `requirements.txt`.
 - If authentication fails, verify `NITAN_USERNAME` / `NITAN_PASSWORD` or `auth_pairs`.
 - If no remote AI tools appear, check whether target Discourse has `/ai/tools`; uscardforum may not expose it.
+- If provider is `openclaw_proxy` and browser fallback reports relay unavailable, attach OpenClaw Browser Relay tab and retry.
+- If Playwright is missing on macOS, run `npm install --no-save playwright && npx playwright install chromium`.

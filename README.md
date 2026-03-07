@@ -9,7 +9,44 @@ This is a heavy modified version of [Discourse MCP](https://github.com/discourse
 **Prerequisites:**
 - **Node.js 18 or higher** (required)
 - Python 3.7+ (required for Cloudflare bypass)
-- pip3 (for Python dependency installation)
+- pip (used via local `.venv` Python)
+
+## Simplified setup by platform
+
+### macOS
+```bash
+npm install
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+```
+
+`npm install` will also auto-install `playwright` and the Chromium runtime on macOS for browser fallback.
+
+### Linux
+```bash
+npm install
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+On non-macOS platforms, Playwright is not auto-installed.
+
+### Windows (PowerShell)
+```powershell
+npm install
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+On non-macOS platforms, Playwright is not auto-installed.
+
+Run health check:
+```bash
+node dist/index.js doctor
+```
 
 **Check your Node.js version:**
 ```bash
@@ -34,13 +71,14 @@ npx -y @nitansde/mcp@latest
 1. ✅ Downloads and caches the package
 2. ✅ Installs Node.js dependencies
 3. ✅ Runs `postinstall` script to check/install Python dependencies
-4. ✅ Checks Python dependencies at runtime and shows helpful warnings if missing
+4. ✅ On macOS, auto-installs `playwright` package and Chromium runtime for browser fallback
+5. ✅ Checks Python dependencies at runtime and shows helpful warnings if missing
 
 **If Python dependencies aren't installed automatically:**
 ```bash
-pip3 install cloudscraper curl-cffi
-# Or install from requirements.txt
-pip3 install -r requirements.txt
+.venv/bin/python -m pip install cloudscraper curl-cffi
+# Or install from requirements.txt (recommended)
+.venv/bin/python -m pip install -r requirements.txt
 ```
 
 **If Python is installed in a virtual environment**
@@ -101,6 +139,64 @@ This server uses an intelligent **dual-method Cloudflare bypass strategy**:
 3. Remembers failures and uses the working method for subsequent requests
 
 This provides maximum reliability against Cloudflare protection. See [CLOUDFLARE_BYPASS.md](CLOUDFLARE_BYPASS.md) for details.
+
+### Browser Fallback (new)
+
+When direct bypass still hits Cloudflare challenge (403/challenge page), browser fallback is enabled by default on macOS.
+
+- Keeps current direct mode as default
+- Triggers browser path only on challenge-like responses
+- **macOS only**: default provider is Playwright persistent profile mode (`playwright`)
+- **macOS only**: `npm install` auto-installs Playwright + Chromium runtime
+- Profile selection for Playwright fallback:
+  - Reuse OpenClaw user-data-dir only when the selected profile directory exists
+  - Otherwise use/create `~/Library/Application Support/NitanMCP/ChromeProfile`
+  - If OpenClaw user-data-dir exists but the selected profile directory is missing, auto-fallback to Nitan profile dir
+  - Never use the system default Chrome profile directory
+- Interactive login keeps working by opening a visible Chrome window with the selected profile
+- Non-macOS: browser fallback is disabled automatically (direct bypass only), and Playwright is not auto-installed
+
+CLI flags (or profile JSON fields):
+
+- `--browser-fallback-enabled=true`
+- `--browser-fallback-provider=playwright`
+- `--browser-fallback-timeout-ms=45000`
+- `--interactive-login-enabled=true`
+- `--login-profile-name="Default"`
+- `--login-check-url="https://www.uscardforum.com/"`
+
+Example:
+
+```bash
+npx -y @nitansde/mcp@latest \
+  --browser-fallback-enabled=true \
+  --browser-fallback-provider=playwright \
+  --interactive-login-enabled=true \
+  --login-profile-name="Default"
+```
+
+If you switch provider to `openclaw_proxy` and relay is unavailable, attach a tab with OpenClaw Browser Relay (badge `ON`) and retry.
+
+If Playwright is missing on macOS, run:
+
+```bash
+npm install --no-save playwright
+npx playwright install chromium
+```
+
+### Python dependency recommendation (all platforms)
+
+Use local venv to avoid system Python policy conflicts (PEP668 / externally managed environments):
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+```
+
+`python_path` now defaults to `.venv/bin/python` when available.
+
+During `npm install`, postinstall now prefers local `.venv` and installs requirements via `.venv` Python/pip.
 
 ### MCP Client Configuration
 **For Claude Desktop (macOS/Windows):**

@@ -110,15 +110,15 @@ export class CloudscraperClient {
           this.logger.error(`Python 脚本未产生任何输出！`);
           this.logger.error(`This usually means:`);
           this.logger.error(`这通常意味着：`);
-          this.logger.error(`  1. Python dependencies not installed (run: ${this.pythonPath === 'python' ? 'pip' : 'pip3'} install -r requirements.txt)`);
-          this.logger.error(`  1. Python 依赖包未安装（运行：${this.pythonPath === 'python' ? 'pip' : 'pip3'} install -r requirements.txt）`);
+          this.logger.error(`  1. Python dependencies not installed (run: "${this.pythonPath}" -m pip install -r requirements.txt)`);
+          this.logger.error(`  1. Python 依赖包未安装（运行："${this.pythonPath}" -m pip install -r requirements.txt）`);
           this.logger.error(`  2. Python script crashed (check stderr above)`);
           this.logger.error(`  2. Python 脚本崩溃（检查上面的 stderr）`);
           this.logger.error(`  3. Wrong Python executable (try: python or python3)`);
           this.logger.error(`  3. 错误的 Python 可执行文件（尝试：python 或 python3）`);
           
           if (stderr.includes('ModuleNotFoundError') || stderr.includes('ImportError')) {
-            reject(new Error(`Python dependencies missing. Run: ${this.pythonPath === 'python' ? 'pip' : 'pip3'} install cloudscraper brotli`));
+            reject(new Error(`Python dependencies missing. Run: "${this.pythonPath}" -m pip install cloudscraper brotli`));
           } else {
             reject(new Error(`Python script produced no output. Exit code: ${code}. Check logs above.`));
           }

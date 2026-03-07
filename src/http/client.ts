@@ -1,6 +1,11 @@
 import { Logger } from "../util/logger.js";
 import { CloudscraperClient } from "./cloudscraper.js";
 import { CurlCffiClient } from "./curl_cffi.js";
+import {
+  BrowserFallbackClient,
+  BrowserFallbackRelayUnavailableError,
+  type BrowserFallbackOptions,
+} from "./browser_fallback.js";
 
 export type AuthMode =
   | { type: "none" }
@@ -22,6 +27,7 @@ export interface HttpClientOptions {
     password: string;
     second_factor_token?: string;
   };
+  browserFallback?: BrowserFallbackOptions;
 }
 
 export class HttpError extends Error {
@@ -42,6 +48,7 @@ export class HttpClient {
   private curlCffiClient?: CurlCffiClient;
   private bypassMethod: BypassMethod;
   private cloudscraperFailed = false; // Track if cloudscraper has failed
+  private browserFallbackClient?: BrowserFallbackClient;
 
   constructor(private opts: HttpClientOptions) {
     this.base = new URL(opts.baseUrl);
@@ -69,6 +76,11 @@ export class HttpClient {
     // Log the active bypass strategy
     if (this.bypassMethod === "both") {
       this.opts.logger.info("Using dual bypass strategy: cloudscraper with curl_cffi fallback");
+    }
+
+    if (opts.browserFallback?.enabled) {
+      this.browserFallbackClient = new BrowserFallbackClient(this.opts.logger, opts.browserFallback);
+      this.opts.logger.info("Browser fallback enabled");
     }
   }
 
@@ -164,9 +176,19 @@ export class HttpClient {
       this.opts.logger.debug(`Request body: ${JSON.stringify(body, null, 2)}`);
     }
 
-    // Use bypass method if configured
+    // Use bypass method if configured; if bypass runtime is unavailable, gracefully fall back to native fetch
     if (this.cloudscraperClient || this.curlCffiClient) {
-      return this.requestViaBypass(method, url, headers, body);
+      try {
+        return await this.requestViaBypass(method, url, headers, body);
+      } catch (e: any) {
+        if (e instanceof BrowserFallbackRelayUnavailableError) {
+          throw e;
+        }
+        if (e instanceof HttpError) {
+          throw e;
+        }
+        this.opts.logger.info(`Bypass path failed, falling back to native fetch: ${e?.message || String(e)}`);
+      }
     }
 
     const controller = new AbortController();
@@ -255,6 +277,70 @@ export class HttpClient {
     }
   }
 
+  private isCloudflareChallenge(status: number | undefined, bodyText: string | undefined, headers: Record<string, string> | undefined): boolean {
+    const normalizedHeaders: Record<string, string> = {};
+    if (headers) {
+      for (const [k, v] of Object.entries(headers)) normalizedHeaders[k.toLowerCase()] = String(v);
+    }
+
+    const cfHeaderHit = Boolean(
+      normalizedHeaders["cf-ray"] ||
+      normalizedHeaders["cf-mitigated"] ||
+      normalizedHeaders["server"]?.toLowerCase().includes("cloudflare")
+    );
+
+    const body = (bodyText || "").toLowerCase();
+    const bodyHit =
+      body.includes("just a moment") ||
+      body.includes("attention required") ||
+      body.includes("/cdn-cgi/challenge-platform/") ||
+      body.includes("cf-challenge");
+
+    const statusHit = status === 403 || status === 429 || status === 503;
+    return Boolean((statusHit && (cfHeaderHit || bodyHit)) || bodyHit);
+  }
+
+  private isLoginRequired(finalUrl: string | undefined, bodyText: string | undefined): boolean {
+    const u = (finalUrl || "").toLowerCase();
+    const b = (bodyText || "").toLowerCase();
+    return (
+      u.includes("/login") ||
+      b.includes("name=\"login\"") ||
+      b.includes("name=\"password\"") ||
+      b.includes("log in")
+    );
+  }
+
+  private async tryBrowserFallback(method: string, url: string, headers: Record<string, string>, body?: unknown): Promise<any> {
+    if (!this.browserFallbackClient?.isEnabled()) {
+      return undefined;
+    }
+
+    this.opts.logger.info(`Attempting browser fallback for ${method} ${url}`);
+    const response = await this.browserFallbackClient.request({
+      url,
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+
+    if (this.isLoginRequired(response.finalUrl, response.body)) {
+      await this.browserFallbackClient.maybePromptInteractiveLogin(this.base.toString());
+    }
+
+    const contentType = response.headers?.["content-type"] || response.headers?.["Content-Type"] || "";
+    if (response.status >= 400) {
+      throw new HttpError(response.status, `Browser fallback HTTP ${response.status}`, safeJson(response.body || ""));
+    }
+
+    if (contentType.includes("application/json")) {
+      return JSON.parse(response.body || "{}");
+    }
+
+    const maybeJson = safeJson(response.body || "");
+    return typeof maybeJson === "string" ? response.body : maybeJson;
+  }
+
   private async requestViaBypass(method: string, url: string, headers: Record<string, string>, body?: unknown): Promise<any> {
     // Convert cookies Map to object
     const cookiesObj: Record<string, string> = {};
@@ -306,11 +392,22 @@ export class HttpClient {
         // Update last URL for Referer header
         this.lastUrl = url;
 
-        // Check for HTTP errors
+        // Check for HTTP errors / Cloudflare challenge
         if (result.status && result.status >= 400) {
+          const isChallenge = this.isCloudflareChallenge(result.status, result.body, result.headers);
+          if (isChallenge && this.browserFallbackClient?.isEnabled()) {
+            this.opts.logger.info(`Cloudflare challenge detected via cloudscraper (${result.status}), switching to browser fallback`);
+            return await this.tryBrowserFallback(method, url, headers, body);
+          }
+
           const errorBody = safeJson(result.body || "");
           this.opts.logger.error(`HTTP ${result.status} for ${method} ${url}: ${result.body}`);
           throw new HttpError(result.status, `HTTP ${result.status}`, errorBody);
+        }
+
+        if (this.isCloudflareChallenge(result.status, result.body, result.headers) && this.browserFallbackClient?.isEnabled()) {
+          this.opts.logger.info(`Cloudflare challenge page detected via cloudscraper (${result.status}), switching to browser fallback`);
+          return await this.tryBrowserFallback(method, url, headers, body);
         }
 
         // Parse response body
@@ -321,6 +418,9 @@ export class HttpClient {
           return result.body;
         }
       } catch (e: any) {
+        if (e instanceof BrowserFallbackRelayUnavailableError) {
+          throw e;
+        }
         if (e instanceof HttpError) {
           throw e; // Don't fallback on HTTP errors (4xx, 5xx)
         }
@@ -369,11 +469,22 @@ export class HttpClient {
         // Update last URL for Referer header
         this.lastUrl = url;
 
-        // Check for HTTP errors
+        // Check for HTTP errors / Cloudflare challenge
         if (result.status && result.status >= 400) {
+          const isChallenge = this.isCloudflareChallenge(result.status, result.body, result.headers);
+          if (isChallenge && this.browserFallbackClient?.isEnabled()) {
+            this.opts.logger.info(`Cloudflare challenge detected via curl_cffi (${result.status}), switching to browser fallback`);
+            return await this.tryBrowserFallback(method, url, headers, body);
+          }
+
           const errorBody = safeJson(result.body || "");
           this.opts.logger.error(`HTTP ${result.status} for ${method} ${url}: ${result.body}`);
           throw new HttpError(result.status, `HTTP ${result.status}`, errorBody);
+        }
+
+        if (this.isCloudflareChallenge(result.status, result.body, result.headers) && this.browserFallbackClient?.isEnabled()) {
+          this.opts.logger.info(`Cloudflare challenge page detected via curl_cffi (${result.status}), switching to browser fallback`);
+          return await this.tryBrowserFallback(method, url, headers, body);
         }
 
         // Parse response body
@@ -384,6 +495,9 @@ export class HttpClient {
           return result.body;
         }
       } catch (e: any) {
+        if (e instanceof BrowserFallbackRelayUnavailableError) {
+          throw e;
+        }
         if (e instanceof HttpError) {
           throw e; // Don't retry on HTTP errors
         }

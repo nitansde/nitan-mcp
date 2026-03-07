@@ -13,6 +13,7 @@ if (majorVersion < 18) {
 }
 
 import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -35,6 +36,12 @@ async function getPackageVersion(): Promise<string> {
 import { Logger, type LogLevel } from "./util/logger.js";
 import { redactObject } from "./util/redact.js";
 import { type AuthMode } from "./http/client.js";
+import {
+  getDefaultBrowserFallbackEnabled,
+  getDefaultBrowserFallbackProvider,
+  resolveBrowserFallbackEnabled,
+  resolveBrowserFallbackProvider,
+} from "./http/browser_fallback_defaults.js";
 import { registerAllTools, type ToolsMode } from "./tools/registry.js";
 import { tryRegisterRemoteTools } from "./tools/remote/tool_exec_api.js";
 import { SiteState, type AuthOverride } from "./site/state.js";
@@ -80,7 +87,15 @@ const ProfileSchema = z
     port: z.number().int().positive().optional().default(3000).describe("Port to listen on when using HTTP transport"),
     use_cloudscraper: z.boolean().optional().describe("(Deprecated: use bypass_method instead) Use Python cloudscraper to bypass Cloudflare"),
     bypass_method: z.enum(["cloudscraper", "curl_cffi", "both"]).optional().default("both").describe("Cloudflare bypass method: 'cloudscraper', 'curl_cffi', or 'both' (default - tries cloudscraper with curl_cffi fallback)"),
-    python_path: z.string().optional().default(process.platform === "win32" ? "python" : "python3").describe("Path to Python executable for bypass methods"),
+    python_path: z.string().optional().default(getDefaultPythonPath()).describe("Path to Python executable for bypass methods (defaults to local .venv python when available)"),
+    browser_fallback_enabled: z.boolean().optional().default(getDefaultBrowserFallbackEnabled()),
+    browser_fallback_provider: z.enum(["playwright", "openclaw_proxy"]).optional().default(getDefaultBrowserFallbackProvider()),
+    browser_fallback_timeout_ms: z.number().int().positive().optional().default(45000),
+    interactive_login_enabled: z.boolean().optional().default(true),
+    login_profile_name: z.string().optional(),
+    login_wait_timeout_ms: z.number().int().positive().optional().default(180000),
+    login_check_url: z.string().url().optional(),
+    skip_site_validation: z.boolean().optional().default(false).describe("Skip --site pre-validation (useful for tests)"),
   })
   .strict();
 
@@ -137,6 +152,12 @@ async function loadProfile(path?: string): Promise<Partial<Profile>> {
   return parsed.data;
 }
 
+function getDefaultPythonPath(): string {
+  const venvPython = process.platform === "win32" ? ".venv\\Scripts\\python.exe" : ".venv/bin/python";
+  if (existsSync(venvPython)) return venvPython;
+  return process.platform === "win32" ? "python" : "python3";
+}
+
 function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>): Profile {
   // Handle simple username/password flags by creating auth_pairs entry
   let authPairs = (flags.auth_pairs as any) ?? profile.auth_pairs;
@@ -191,7 +212,17 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
     port: ((flags.port as number | undefined) ?? profile.port ?? 3000) as number,
     use_cloudscraper: (((flags.use_cloudscraper ?? flags["use-cloudscraper"]) as boolean | undefined) ?? profile.use_cloudscraper) as boolean | undefined,
     bypass_method: (((flags.bypass_method ?? flags["bypass-method"]) as "cloudscraper" | "curl_cffi" | "both" | undefined) ?? profile.bypass_method ?? "both") as "cloudscraper" | "curl_cffi" | "both",
-    python_path: (((flags.python_path ?? flags["python-path"]) as string | undefined) ?? profile.python_path ?? (process.platform === "win32" ? "python" : "python3")) as string,
+    python_path: (((flags.python_path ?? flags["python-path"]) as string | undefined) ?? profile.python_path ?? getDefaultPythonPath()) as string,
+    browser_fallback_enabled: (((flags.browser_fallback_enabled ?? flags["browser-fallback-enabled"]) as boolean | undefined) ?? profile.browser_fallback_enabled ?? getDefaultBrowserFallbackEnabled()) as boolean,
+    browser_fallback_provider: resolveBrowserFallbackProvider(
+      (((flags.browser_fallback_provider ?? flags["browser-fallback-provider"]) as "playwright" | "openclaw_proxy" | undefined) ?? profile.browser_fallback_provider) as "playwright" | "openclaw_proxy" | undefined
+    ) as "playwright" | "openclaw_proxy",
+    browser_fallback_timeout_ms: (((flags.browser_fallback_timeout_ms ?? flags["browser-fallback-timeout-ms"]) as number | undefined) ?? profile.browser_fallback_timeout_ms ?? 45000) as number,
+    interactive_login_enabled: (((flags.interactive_login_enabled ?? flags["interactive-login-enabled"]) as boolean | undefined) ?? profile.interactive_login_enabled ?? true) as boolean,
+    login_profile_name: (((flags.login_profile_name ?? flags["login-profile-name"]) as string | undefined) ?? profile.login_profile_name) as string | undefined,
+    login_wait_timeout_ms: (((flags.login_wait_timeout_ms ?? flags["login-wait-timeout-ms"]) as number | undefined) ?? profile.login_wait_timeout_ms ?? 180000) as number,
+    login_check_url: (((flags.login_check_url ?? flags["login-check-url"]) as string | undefined) ?? profile.login_check_url) as string | undefined,
+    skip_site_validation: (((flags.skip_site_validation ?? flags["skip-site-validation"]) as boolean | undefined) ?? profile.skip_site_validation ?? false) as boolean,
   } satisfies Profile;
   
   const result = ProfileSchema.safeParse(merged);
@@ -250,11 +281,11 @@ except ImportError as e:
         logger.info("   To fix this, run one of these commands:");
         logger.info("   要修复此问题，请运行以下命令之一：");
         logger.info("");
-        logger.info(`   ${pythonPath === "python" ? "pip" : "pip3"} install cloudscraper curl-cffi`);
+        logger.info(`   "${pythonPath}" -m pip install cloudscraper curl-cffi`);
         logger.info("");
         logger.info("   Or install all dependencies from requirements.txt:");
         logger.info("   或从 requirements.txt 安装所有依赖：");
-        logger.info(`   ${pythonPath === "python" ? "pip" : "pip3"} install -r requirements.txt`);
+        logger.info(`   "${pythonPath}" -m pip install -r requirements.txt`);
         logger.info("");
         resolve(); // Don't block server startup
       }
@@ -273,8 +304,10 @@ except ImportError as e:
       logger.info("   1. 从 https://python.org 安装 Python 3.7+");
       logger.info(`   2. Make sure '${pythonPath}' is in your PATH`);
       logger.info(`   2. 确保 '${pythonPath}' 在您的 PATH 环境变量中`);
-      logger.info("   3. Install required packages: pip3 install cloudscraper curl-cffi");
-      logger.info("   3. 安装所需的包：pip3 install cloudscraper curl-cffi");
+      logger.info("   3. Create local venv: python3 -m venv .venv");
+      logger.info("   3. 创建本地 venv：python3 -m venv .venv");
+      logger.info("   4. Install required packages: .venv/bin/python -m pip install -r requirements.txt");
+      logger.info("   4. 安装所需的包：.venv/bin/python -m pip install -r requirements.txt");
       logger.info("");
       logger.info(`   If Python is installed with a different name, use:`);
       logger.info(`   如果 Python 以不同的名称安装，请使用：`);
@@ -285,9 +318,137 @@ except ImportError as e:
   });
 }
 
+async function probePythonDeps(pythonPath: string): Promise<{ ok: boolean; reason?: string }> {
+  return new Promise((resolve) => {
+    const checkScript = `
+import sys
+try:
+    import cloudscraper
+    import curl_cffi
+    print("OK")
+except Exception as e:
+    print(f"ERR:{type(e).__name__}:{e}")
+    sys.exit(1)
+`;
+    const proc = spawn(pythonPath, ["-c", checkScript]);
+    let out = "";
+    let err = "";
+    proc.stdout.on("data", (d) => (out += d.toString()));
+    proc.stderr.on("data", (d) => (err += d.toString()));
+    proc.on("error", (e) => resolve({ ok: false, reason: `python_spawn_failed: ${String(e)}` }));
+    proc.on("close", (code) => {
+      if (code === 0 && out.includes("OK")) return resolve({ ok: true });
+      return resolve({ ok: false, reason: (out || err || `exit_${code}`).trim() });
+    });
+  });
+}
+
+async function probePlaywright(): Promise<{
+  installed: boolean;
+  runtimeInstalled: boolean;
+  reason?: string;
+  executablePath?: string;
+}> {
+  let playwright: any;
+  try {
+    const dynamicImport = new Function("m", "return import(m)") as (m: string) => Promise<any>;
+    playwright = await dynamicImport("playwright");
+  } catch (e: any) {
+    return {
+      installed: false,
+      runtimeInstalled: false,
+      reason: e?.message || String(e),
+    };
+  }
+
+  try {
+    const executablePath = playwright?.chromium?.executablePath?.() as string | undefined;
+    const runtimeInstalled = Boolean(executablePath && existsSync(executablePath));
+    return {
+      installed: true,
+      runtimeInstalled,
+      executablePath,
+      reason: runtimeInstalled ? undefined : `chromium_executable_not_found:${executablePath || "unknown"}`,
+    };
+  } catch (e: any) {
+    return {
+      installed: true,
+      runtimeInstalled: false,
+      reason: e?.message || String(e),
+    };
+  }
+}
+
+function platformInstallGuide(opts?: { includePlaywrightFix?: boolean }): string[] {
+  if (process.platform === "darwin") {
+    const lines = [
+      "python3 -m venv .venv",
+      ". .venv/bin/activate",
+      "pip install -r requirements.txt",
+    ];
+    if (opts?.includePlaywrightFix) {
+      lines.push("npm install --no-save playwright");
+      lines.push("npx playwright install chromium");
+    }
+    return lines;
+  }
+  if (process.platform === "linux") {
+    return [
+      "python3 -m venv .venv",
+      "source .venv/bin/activate",
+      "pip install -r requirements.txt",
+    ];
+  }
+  return [
+    "py -3 -m venv .venv",
+    ".\\.venv\\Scripts\\Activate.ps1",
+    "pip install -r requirements.txt",
+  ];
+}
+
+async function runDoctor() {
+  const pythonPath = getDefaultPythonPath();
+  const pyProbe = await probePythonDeps(pythonPath);
+  const isMac = process.platform === "darwin";
+  const chromeExists = isMac ? existsSync("/Applications/Google Chrome.app") : undefined;
+  const playwrightProbe = isMac ? await probePlaywright() : undefined;
+
+  console.log("nitan-mcp doctor");
+  console.log(`- platform: ${process.platform}`);
+  console.log(`- node: ${process.versions.node}`);
+  console.log(`- default python_path: ${pythonPath}`);
+  console.log(`- python deps (cloudscraper/curl_cffi): ${pyProbe.ok ? "OK" : "MISSING"}`);
+  if (!pyProbe.ok) console.log(`  reason: ${pyProbe.reason}`);
+
+  if (isMac) {
+    console.log(`- chrome app: ${chromeExists ? "FOUND" : "MISSING"}`);
+    console.log(`- playwright package: ${playwrightProbe?.installed ? "INSTALLED" : "MISSING"}`);
+    console.log(`- playwright runtime (chromium): ${playwrightProbe?.runtimeInstalled ? "INSTALLED" : "MISSING"}`);
+    if (playwrightProbe?.reason && (!playwrightProbe.installed || !playwrightProbe.runtimeInstalled)) {
+      console.log(`  reason: ${playwrightProbe.reason}`);
+    }
+    console.log("- browser fallback availability (macOS only): enabled by default");
+    console.log(`- browser fallback provider default: ${getDefaultBrowserFallbackProvider()} (openclaw_proxy is opt-in)`);
+    console.log("- profile priority: OpenClaw selected profile (if present) -> NitanMCP dedicated profile (auto-created)");
+  } else {
+    console.log("- browser fallback: DISABLED on non-macOS (by design)");
+    console.log("- playwright install: SKIPPED on non-macOS (by design)");
+  }
+
+  const needsPlaywrightFix = Boolean(isMac && (!playwrightProbe?.installed || !playwrightProbe?.runtimeInstalled));
+  if (!pyProbe.ok || (isMac && (!chromeExists || needsPlaywrightFix))) {
+    console.log("\nSuggested setup commands:");
+    for (const line of platformInstallGuide({ includePlaywrightFix: needsPlaywrightFix })) console.log(`  ${line}`);
+  }
+}
+
 async function main() {
   // Check if user wants to generate a User API Key
   const args = process.argv.slice(2);
+  if (args[0] === "doctor") {
+    await runDoctor();
+    return;
+  }
   if (args[0] === "generate-user-api-key") {
     const options: any = { site: "" };
     for (let i = 1; i < args.length; i++) {
@@ -340,6 +501,11 @@ async function main() {
       // ignore
     }
   }
+  const browserFallbackEnabled = resolveBrowserFallbackEnabled(config.browser_fallback_enabled);
+  if (config.browser_fallback_enabled && process.platform !== "darwin") {
+    logger.info("Browser fallback is disabled on non-macOS platforms; using direct bypass only.");
+  }
+
   const siteState = new SiteState({
     logger,
     timeoutMs: config.timeout_ms,
@@ -347,6 +513,15 @@ async function main() {
     authOverrides,
     bypassMethod: config.use_cloudscraper ? "both" : config.bypass_method, // Legacy support: use_cloudscraper=true => "both"
     pythonPath: config.python_path,
+    browserFallback: {
+      enabled: browserFallbackEnabled,
+      provider: config.browser_fallback_provider,
+      timeoutMs: config.browser_fallback_timeout_ms,
+      interactiveLoginEnabled: process.platform === "darwin" ? config.interactive_login_enabled : false,
+      loginProfileName: config.login_profile_name,
+      loginWaitTimeoutMs: config.login_wait_timeout_ms,
+      loginCheckUrl: config.login_check_url,
+    },
   });
 
   const server = new McpServer(
@@ -369,11 +544,17 @@ async function main() {
   if (config.site) {
     try {
       const { base, client } = siteState.buildClientForSite(config.site);
-      const about = (await client.get(`/about.json`)) as any;
-      const title = about?.about?.title || about?.title || base;
-      siteState.selectSite(base);
-      hideSelectSite = true;
-      logger.info(`Tethered to site: ${base} (${title})`);
+      if (!config.skip_site_validation) {
+        const about = (await client.get(`/about.json`)) as any;
+        const title = about?.about?.title || about?.title || base;
+        siteState.selectSite(base);
+        hideSelectSite = true;
+        logger.info(`Tethered to site: ${base} (${title})`);
+      } else {
+        siteState.selectSite(base);
+        hideSelectSite = true;
+        logger.info(`Tethered to site without validation: ${base}`);
+      }
     } catch (e: any) {
       throw new Error(`Failed to validate --site ${config.site}: ${e?.message || String(e)}`);
     }
