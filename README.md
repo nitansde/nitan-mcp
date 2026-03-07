@@ -50,6 +50,49 @@ npx -y @nitansde/mcp@latest --python_path /path/to/python_executable
 
 The server will start even if Python dependencies are missing, but Cloudflare bypass features won't work until you install them.
 
+### Skill Distribution (OpenClaw AgentSkill)
+
+This project also ships an **AgentSkill** (additive only, does **not** change MCP runtime behavior).
+
+- Skill source: `skills/nitan/SKILL.md`
+- Pack command:
+
+```bash
+pnpm skill:pack
+# output: dist-skill/nitan.skill
+```
+
+#### Install Skill in OpenClaw
+
+Option A (recommended): install the packaged file
+
+1. Build the skill package:
+
+```bash
+pnpm skill:pack
+```
+
+2. Import `dist-skill/nitan.skill` into OpenClaw Skill manager (or your skill distribution channel).
+
+Option B: install from source folder (local development)
+
+1. Copy `skills/nitan/` to your OpenClaw skills directory.
+2. Restart/reload OpenClaw so it re-indexes skills.
+
+Release-ready checklist:
+
+```bash
+pnpm install
+pnpm typecheck
+pnpm build
+pnpm test
+pnpm skill:pack
+```
+
+Publish flow:
+- npm package publish remains unchanged.
+- Attach `dist-skill/nitan.skill` as a release artifact (or upload to your skill channel).
+
 ### Cloudflare Bypass
 
 This server uses an intelligent **dual-method Cloudflare bypass strategy**:
@@ -72,14 +115,16 @@ This provides maximum reliability against Cloudflare protection. See [CLOUDFLARE
       ],
       "env": {
         "NITAN_USERNAME": "YOUR_USERNAME",
-        "NITAN_PASSWORD": "YOUR_PASSWORD",
+        "NITAN_PASSWORD": "YOUR_PASSWORD"
       }
     }
   }
 }
 ```
 
-Use optinal env `"TIME_ZONE": "America/New_York"` if you want to use a timezone different to your local clock.
+`NITAN_USERNAME` and `NITAN_PASSWORD` are optional for public read-only access.
+
+Use optinal env `"TIMEZONE": "America/New_York"` if you want to use a timezone different to your local clock.
 
 **Configuration file location:**
 ```

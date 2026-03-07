@@ -4,3 +4,4 @@ node_modules/*
 .mcp.json
 my-login.json
 cookies.json
+dist-skill/*

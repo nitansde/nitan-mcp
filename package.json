@@ -11,6 +11,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json && npm run copy:python",
+    "skill:pack": "bash scripts/package-skill.sh",
     "copy:python": "mkdir -p dist/http && cp src/http/cloudscraper_wrapper.py dist/http/ && cp src/http/curl_cffi_wrapper.py dist/http/ && cp requirements.txt dist/",
     "postinstall": "node scripts/check-python-deps.mjs",
     "prepublishOnly": "pnpm run build",
@@ -27,6 +28,8 @@
   "files": [
     "dist/**",
     "scripts/check-python-deps.mjs",
+    "scripts/package-skill.sh",
+    "skills/**",
     "README.md",
     "LICENSE"
   ],

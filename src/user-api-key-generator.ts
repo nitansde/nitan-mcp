@@ -114,13 +114,13 @@ async function saveToProfile(
 export async function generateUserApiKey(options: GenerateOptions): Promise<void> {
   if (!options.site) {
     console.error(`
-Usage: discourse-mcp generate-user-api-key [options]
+Usage: nitan-mcp generate-user-api-key [options]
 
 Options:
   --site <url>              Discourse site URL (required)
   --scopes <scopes>         Comma-separated scopes (default: read,write)
-  --application-name <name> Application name (default: Discourse MCP)
-  --client-id <id>          Client ID (default: discourse-mcp)
+  --application-name <name> Application name (default: Nitan MCP)
+  --client-id <id>          Client ID (default: nitan-mcp)
   --nonce <nonce>           Nonce for request (default: timestamp)
   --payload <payload>       Encrypted payload (skip interactive prompt)
   --save-to <file>          Save to profile file instead of printing
@@ -128,13 +128,13 @@ Options:
 
 Examples:
   # Interactive mode
-  discourse-mcp generate-user-api-key --site https://discourse.example.com
+  nitan-mcp generate-user-api-key --site https://discourse.example.com
 
   # Save to profile
-  discourse-mcp generate-user-api-key --site https://discourse.example.com --save-to profile.json
+  nitan-mcp generate-user-api-key --site https://discourse.example.com --save-to profile.json
 
   # Non-interactive with payload
-  discourse-mcp generate-user-api-key --site https://discourse.example.com --payload "base64..."
+  nitan-mcp generate-user-api-key --site https://discourse.example.com --payload "base64..."
 `);
     process.exit(1);
   }

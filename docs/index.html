@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nitan 项目主页</title>
+  <style>
+    :root {
+      --bg: #f4f8ff;
+      --bg-soft: #ffffff;
+      --ink: #10243f;
+      --ink-muted: #4b5f7a;
+      --brand: #0f5fe0;
+      --brand-soft: #e6f0ff;
+      --line: #d7e4ff;
+      --ok: #10895e;
+      --shadow: 0 14px 36px rgba(15, 58, 138, 0.12);
+      --radius: 18px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 0% 0%, #dce9ff 0, transparent 40%),
+        radial-gradient(circle at 100% 0%, #e5f6ff 0, transparent 42%),
+        var(--bg);
+      line-height: 1.65;
+    }
+
+    .container {
+      width: min(1080px, 92vw);
+      margin: 0 auto;
+    }
+
+    .hero {
+      padding: 64px 0 44px;
+    }
+
+    .hero-card {
+      background: linear-gradient(135deg, #0f5fe0 0%, #1582dd 100%);
+      color: #fff;
+      border-radius: calc(var(--radius) + 4px);
+      box-shadow: var(--shadow);
+      padding: clamp(24px, 4vw, 42px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-card::after {
+      content: "";
+      position: absolute;
+      right: -70px;
+      top: -60px;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.46);
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 4.6vw, 48px);
+      letter-spacing: 0.5px;
+      line-height: 1.2;
+    }
+
+    .hero p {
+      margin: 12px 0 0;
+      max-width: 760px;
+      font-size: clamp(16px, 2.3vw, 19px);
+      opacity: 0.95;
+    }
+
+    .hero-links {
+      margin-top: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .hero-links a {
+      color: #fff;
+      text-decoration: none;
+      border: 1px solid rgba(255, 255, 255, 0.48);
+      border-radius: 12px;
+      padding: 9px 14px;
+      font-size: 14px;
+      transition: 180ms ease;
+      backdrop-filter: blur(4px);
+    }
+
+    .hero-links a:hover {
+      background: rgba(255, 255, 255, 0.16);
+      transform: translateY(-1px);
+    }
+
+    main {
+      padding-bottom: 56px;
+      animation: appear 520ms ease;
+    }
+
+    @keyframes appear {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    section {
+      background: var(--bg-soft);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: clamp(18px, 3.6vw, 28px);
+      box-shadow: 0 8px 18px rgba(16, 36, 63, 0.05);
+      margin-bottom: 18px;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: clamp(22px, 3.1vw, 28px);
+      letter-spacing: 0.3px;
+    }
+
+    p {
+      margin: 10px 0;
+      color: var(--ink-muted);
+    }
+
+    ul,
+    ol {
+      margin: 10px 0;
+      padding-left: 22px;
+      color: var(--ink-muted);
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .feature {
+      background: #f7fbff;
+      border: 1px solid #dce9ff;
+      border-radius: 14px;
+      padding: 12px 14px;
+      color: var(--ink);
+      font-size: 15px;
+    }
+
+    .code-wrap {
+      background: #0d1c33;
+      color: #e6efff;
+      border-radius: 14px;
+      overflow: auto;
+      border: 1px solid #233f66;
+      margin-top: 12px;
+    }
+
+    pre {
+      margin: 0;
+      padding: 14px 16px;
+      font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.55;
+      white-space: pre;
+    }
+
+    code {
+      font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+      background: var(--brand-soft);
+      color: #11386f;
+      border-radius: 8px;
+      padding: 2px 6px;
+      font-size: 90%;
+    }
+
+    .note {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: #eefaf5;
+      border: 1px solid #cbeedf;
+      color: #14593f;
+      border-radius: 10px;
+    }
+
+    .qa {
+      margin-top: 8px;
+      border-top: 1px dashed #d8e4f8;
+      padding-top: 8px;
+    }
+
+    .qa strong {
+      color: var(--ink);
+    }
+
+    footer {
+      text-align: center;
+      color: #5d6f8c;
+      font-size: 13px;
+      padding: 6px 0 28px;
+    }
+
+    @media (max-width: 720px) {
+      .hero {
+        padding-top: 34px;
+      }
+
+      .hero-links {
+        flex-direction: column;
+      }
+
+      .hero-links a {
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="container">
+      <div class="hero-card">
+        <span class="tag">Nitan MCP 项目主页</span>
+        <h1>连接论坛能力与智能体工作流</h1>
+        <p>
+          Nitan 是基于 Discourse MCP 深度改造的项目，面向 uscardforum 使用场景，提供稳定的 MCP
+          工具能力，并同时发布可复用的 nitan Skill。
+        </p>
+        <div class="hero-links">
+          <a href="https://github.com/your-org/nitan-mcp" target="_blank" rel="noreferrer">GitHub 链接（占位）</a>
+          <a href="https://www.npmjs.com/package/@nitansde/mcp" target="_blank" rel="noreferrer">NPM 包页面</a>
+          <a href="https://www.uscardforum.com/t/topic/450599" target="_blank" rel="noreferrer">uscardforum 讨论贴</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="intro">
+      <h2>项目简介</h2>
+      <p>
+        Nitan 项目用于把 Discourse 论坛能力暴露为 MCP 工具，便于 Claude Desktop 等客户端按统一接口完成搜索、阅读与自动化流程。项目默认以只读模式安全运行，也支持在满足权限条件下开启写入能力。
+      </p>
+      <p>
+        该仓库同时提供 Skill（名称为 nitan）用于增强智能体执行体验，Skill 为附加能力，不改变 MCP 运行时行为。
+      </p>
+    </section>
+
+    <section id="capabilities">
+      <h2>核心能力</h2>
+      <div class="grid">
+        <div class="feature">论坛数据工具：搜索、读取话题、读取帖子、分类与标签浏览。</div>
+        <div class="feature">站点模式：支持固定站点模式或动态选择站点模式。</div>
+        <div class="feature">权限控制：默认只读，写入能力由参数和鉴权共同决定。</div>
+        <div class="feature">抗防护能力：Cloudflare 双策略自动回退，提升请求稳定性。</div>
+        <div class="feature">远程工具扩展：可按站点发现并注册远程工具。</div>
+        <div class="feature">Skill 支持：可打包并分发 nitan Skill，支持本地或文件导入。</div>
+      </div>
+    </section>
+
+    <section id="quick-start">
+      <h2>快速开始</h2>
+      <ol>
+        <li>准备环境：Node.js 18+，Python 3.7+，以及 pip3。</li>
+        <li>推荐直接运行：<code>npx -y @nitansde/mcp@latest</code>。</li>
+        <li>如需本地开发，执行以下命令：</li>
+      </ol>
+      <div class="code-wrap">
+        <pre><code>pnpm install
+pnpm build
+node dist/index.js</code></pre>
+      </div>
+      <p>如 Python 依赖未自动安装，可执行 <code>pip3 install -r requirements.txt</code>。</p>
+    </section>
+
+    <section id="skill-install">
+      <h2>Skill 安装</h2>
+      <p>
+        Skill 名称为 <code>nitan</code>，可通过打包产物导入。当前准确产物路径为
+        <code>dist-skill/nitan.skill</code>。
+      </p>
+      <div class="code-wrap">
+        <pre><code>pnpm skill:pack
+# 输出：dist-skill/nitan.skill</code></pre>
+      </div>
+      <ul>
+        <li>方式一（推荐）：导入 <code>dist-skill/nitan.skill</code> 到 Skill 管理器。</li>
+        <li>方式二：复制 <code>skills/nitan/</code> 到本地 Skill 目录并重载。</li>
+      </ul>
+    </section>
+
+    <section id="mcp-config">
+      <h2>MCP 客户端配置示例</h2>
+      <p>以下示例展示名称为 <code>nitan</code> 的 MCP 服务器配置。</p>
+      <div class="code-wrap">
+        <pre><code>{
+  "mcpServers": {
+    "nitan": {
+      "command": "npx",
+      "args": ["-y", "@nitansde/mcp@latest"],
+      "env": {
+        "NITAN_USERNAME": "你的用户名（可选）",
+        "NITAN_PASSWORD": "你的密码（可选）",
+        "TIMEZONE": "America/New_York"
+      }
+    }
+  }
+}</code></pre>
+      </div>
+      <p class="note">
+        说明：<code>NITAN_USERNAME</code> 与 <code>NITAN_PASSWORD</code> 为可选变量；不填写时可使用公开只读能力。<code>TIMEZONE</code>
+        用于指定时区，未设置时默认使用本地时钟。
+      </p>
+    </section>
+
+    <section id="faq">
+      <h2>常见问题</h2>
+      <div class="qa">
+        <p><strong>问：</strong>不配置账号密码可以用吗？</p>
+        <p><strong>答：</strong>可以，公开内容的只读访问可直接使用；需要受限能力时再配置账号密码。</p>
+      </div>
+      <div class="qa">
+        <p><strong>问：</strong>Cloudflare 相关功能失效怎么办？</p>
+        <p><strong>答：</strong>先确认 Python 依赖已安装，再检查运行环境中的 Python 路径是否可用。</p>
+      </div>
+      <div class="qa">
+        <p><strong>问：</strong>Skill 会改变 MCP 服务行为吗？</p>
+        <p><strong>答：</strong>不会，Skill 为附加能力，MCP 运行逻辑保持不变。</p>
+      </div>
+    </section>
+
+    <section id="release">
+      <h2>发布信息</h2>
+      <ul>
+        <li>NPM 发布流程保持不变，包名为 <code>@nitansde/mcp</code>。</li>
+        <li>发布版本时建议同步上传 <code>dist-skill/nitan.skill</code> 作为 Skill 产物。</li>
+        <li>项目链接占位：GitHub、NPM、uscardforum 讨论贴可按实际地址替换。</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    Nitan 项目主页示例 · 适配桌面与移动端
+  </footer>
+</body>
+</html>
