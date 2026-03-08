@@ -625,12 +625,21 @@ async function main() {
     });
 
     // Exit cleanly on SIGTERM/SIGINT
+    let exiting = false;
     const onExit = () => {
-      httpServer.close(() => {
-        transport.close().then(() => {
-          logger.info("HTTP server closed");
-          process.exit(0);
+      if (exiting) return;
+      exiting = true;
+      void (async () => {
+        await siteState.dispose();
+        await new Promise<void>((resolve) => {
+          httpServer.close(() => resolve());
         });
+        await transport.close();
+        logger.info("HTTP server closed");
+        process.exit(0);
+      })().catch((e) => {
+        logger.error(`HTTP shutdown error: ${e?.message || String(e)}`);
+        process.exit(1);
       });
     };
     process.on("SIGTERM", onExit);
@@ -640,7 +649,14 @@ async function main() {
     const transport = new StdioServerTransport();
 
     // Exit cleanly on stdin close or SIGTERM
-    const onExit = () => process.exit(0);
+    let exiting = false;
+    const onExit = () => {
+      if (exiting) return;
+      exiting = true;
+      void siteState.dispose().finally(() => {
+        process.exit(0);
+      });
+    };
     process.on("SIGTERM", onExit);
     process.on("SIGINT", onExit);
     process.stdin.on("close", onExit);

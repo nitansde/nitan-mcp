@@ -64,6 +64,7 @@ Use this shape.
   - Otherwise use/create `~/Library/Application Support/NitanMCP/ChromeProfile`.
   - If OpenClaw user-data-dir exists but selected profile directory is missing, auto-fallback to Nitan profile dir.
   - Never use system default Chrome profile directory.
+- If fallback hits login/not_logged_in and `NITAN_USERNAME` + `NITAN_PASSWORD` are set, Playwright auto-login is attempted and request is retried once.
 - On **macOS**, interactive login flow is allowed: bring up a visible Chrome profile and ask user to login.
 - On non-macOS, browser fallback is disabled automatically. Do **not** attempt GUI bring-up, and Playwright is not auto-installed.
 
@@ -71,7 +72,7 @@ Useful flags:
 - `--browser-fallback-enabled=true`
 - `--browser-fallback-provider=playwright`
 - `--interactive-login-enabled=true`
-- `--login-profile-name="Default"`
+- `--login-profile-name="nitan"`
 
 Note:
 - If provider is switched to `openclaw_proxy` and relay tab is unavailable, attach OpenClaw Browser Relay tab first (badge should be `ON`).

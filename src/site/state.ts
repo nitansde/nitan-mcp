@@ -86,6 +86,11 @@ export class SiteState {
     return { base, client };
   }
 
+  async dispose(): Promise<void> {
+    const clients = Array.from(new Set(this.clientCache.values()));
+    await Promise.allSettled(clients.map((client) => client.dispose()));
+  }
+
   private resolveAuthForSite(base: string): AuthMode {
     const overrides = this.opts.authOverrides || [];
     const match = overrides.find((o) => normalizeBase(o.site) === base || this.sameOrigin(o.site, base));

@@ -316,16 +316,26 @@ export class HttpClient {
       return undefined;
     }
 
-    this.opts.logger.info(`Attempting browser fallback for ${method} ${url}`);
-    const response = await this.browserFallbackClient.request({
+    const browserRequest = {
       url,
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    };
+
+    this.opts.logger.info(`Attempting browser fallback for ${method} ${url}`);
+    let response = await this.browserFallbackClient.request(browserRequest);
 
     if (this.isLoginRequired(response.finalUrl, response.body)) {
-      await this.browserFallbackClient.maybePromptInteractiveLogin(this.base.toString());
+      const autoLoginAttempted = await this.browserFallbackClient.maybeAutoLogin(this.base.toString());
+      if (autoLoginAttempted) {
+        this.opts.logger.info(`Retrying browser fallback once after auto-login for ${method} ${url}`);
+        response = await this.browserFallbackClient.request(browserRequest);
+      }
+
+      if (this.isLoginRequired(response.finalUrl, response.body)) {
+        await this.browserFallbackClient.maybePromptInteractiveLogin(this.base.toString());
+      }
     }
 
     const contentType = response.headers?.["content-type"] || response.headers?.["Content-Type"] || "";
@@ -517,6 +527,15 @@ export class HttpClient {
     
     // This should never happen if configuration is correct
     throw new Error("No bypass method available");
+  }
+
+  async dispose(): Promise<void> {
+    if (!this.browserFallbackClient) return;
+    try {
+      await this.browserFallbackClient.dispose();
+    } catch (e: any) {
+      this.opts.logger.debug(`Failed to dispose browser fallback client cleanly: ${e?.message || String(e)}`);
+    }
   }
 }
 

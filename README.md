@@ -153,6 +153,7 @@ When direct bypass still hits Cloudflare challenge (403/challenge page), browser
   - Otherwise use/create `~/Library/Application Support/NitanMCP/ChromeProfile`
   - If OpenClaw user-data-dir exists but the selected profile directory is missing, auto-fallback to Nitan profile dir
   - Never use the system default Chrome profile directory
+- If fallback lands on login/not_logged_in and `NITAN_USERNAME` + `NITAN_PASSWORD` are set, Playwright auto-login is attempted and request is retried once
 - Interactive login keeps working by opening a visible Chrome window with the selected profile
 - Non-macOS: browser fallback is disabled automatically (direct bypass only), and Playwright is not auto-installed
 
@@ -162,7 +163,7 @@ CLI flags (or profile JSON fields):
 - `--browser-fallback-provider=playwright`
 - `--browser-fallback-timeout-ms=45000`
 - `--interactive-login-enabled=true`
-- `--login-profile-name="Default"`
+- `--login-profile-name="nitan"`
 - `--login-check-url="https://www.uscardforum.com/"`
 
 Example:
@@ -172,7 +173,7 @@ npx -y @nitansde/mcp@latest \
   --browser-fallback-enabled=true \
   --browser-fallback-provider=playwright \
   --interactive-login-enabled=true \
-  --login-profile-name="Default"
+  --login-profile-name="nitan"
 ```
 
 If you switch provider to `openclaw_proxy` and relay is unavailable, attach a tab with OpenClaw Browser Relay (badge `ON`) and retry.
