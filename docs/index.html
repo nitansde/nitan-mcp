@@ -1,371 +1,2053 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Nitan 项目主页</title>
-  <style>
-    :root {
-      --bg: #f4f8ff;
-      --bg-soft: #ffffff;
-      --ink: #10243f;
-      --ink-muted: #4b5f7a;
-      --brand: #0f5fe0;
-      --brand-soft: #e6f0ff;
-      --line: #d7e4ff;
-      --ok: #10895e;
-      --shadow: 0 14px 36px rgba(15, 58, 138, 0.12);
-      --radius: 18px;
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" href="logo.png" />
+    <meta
+      name="description"
+      content="Nitan MCP 项目主页：USCardForum 专用 MCP 工具集。聚焦搜索、读帖、通知、热帖追踪、稳定登录与 Cloudflare fallback。"
+    />
+    <meta property="og:title" content="Nitan MCP" />
+    <meta
+      property="og:description"
+      content="USCardForum 专用 MCP 工具集：搜索、读帖、通知、热榜、稳定登录、Cloudflare fallback 与 OpenClaw Skill。"
+    />
+    <meta property="og:type" content="website" />
+    <title>Nitan MCP · Project Home</title>
 
-    * {
-      box-sizing: border-box;
-    }
+    <style>
+      :root {
+        color-scheme: dark;
 
-    body {
-      margin: 0;
-      font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
-      color: var(--ink);
-      background:
-        radial-gradient(circle at 0% 0%, #dce9ff 0, transparent 40%),
-        radial-gradient(circle at 100% 0%, #e5f6ff 0, transparent 42%),
-        var(--bg);
-      line-height: 1.65;
-    }
-
-    .container {
-      width: min(1080px, 92vw);
-      margin: 0 auto;
-    }
-
-    .hero {
-      padding: 64px 0 44px;
-    }
-
-    .hero-card {
-      background: linear-gradient(135deg, #0f5fe0 0%, #1582dd 100%);
-      color: #fff;
-      border-radius: calc(var(--radius) + 4px);
-      box-shadow: var(--shadow);
-      padding: clamp(24px, 4vw, 42px);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .hero-card::after {
-      content: "";
-      position: absolute;
-      right: -70px;
-      top: -60px;
-      width: 220px;
-      height: 220px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.14);
-    }
-
-    .tag {
-      display: inline-flex;
-      align-items: center;
-      border: 1px solid rgba(255, 255, 255, 0.46);
-      border-radius: 999px;
-      padding: 5px 12px;
-      font-size: 13px;
-      margin-bottom: 12px;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: clamp(30px, 4.6vw, 48px);
-      letter-spacing: 0.5px;
-      line-height: 1.2;
-    }
-
-    .hero p {
-      margin: 12px 0 0;
-      max-width: 760px;
-      font-size: clamp(16px, 2.3vw, 19px);
-      opacity: 0.95;
-    }
-
-    .hero-links {
-      margin-top: 20px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .hero-links a {
-      color: #fff;
-      text-decoration: none;
-      border: 1px solid rgba(255, 255, 255, 0.48);
-      border-radius: 12px;
-      padding: 9px 14px;
-      font-size: 14px;
-      transition: 180ms ease;
-      backdrop-filter: blur(4px);
-    }
-
-    .hero-links a:hover {
-      background: rgba(255, 255, 255, 0.16);
-      transform: translateY(-1px);
-    }
-
-    main {
-      padding-bottom: 56px;
-      animation: appear 520ms ease;
-    }
-
-    @keyframes appear {
-      from {
-        opacity: 0;
-        transform: translateY(8px);
+        --bg: #040404;
+        --bg-soft: #0a0b0d;
+        --panel: rgba(255, 255, 255, 0.05);
+        --panel-strong: rgba(255, 255, 255, 0.07);
+        --panel-solid: #111216;
+        --line: rgba(255, 255, 255, 0.09);
+        --line-strong: rgba(255, 255, 255, 0.16);
+        --text: #f5f7fb;
+        --muted: rgba(233, 237, 245, 0.7);
+        --faint: rgba(233, 237, 245, 0.46);
+        --mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        --sans: "Inter", "Space Grotesk", "Avenir Next", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        --shadow: 0 20px 70px rgba(0, 0, 0, 0.5);
+        --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.28);
+        --radius-xl: 28px;
+        --radius-lg: 20px;
+        --radius-md: 16px;
+        --page: min(1180px, calc(100vw - 32px));
       }
-      to {
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 12% 14%, rgba(81, 132, 255, 0.12), transparent 28%),
+          radial-gradient(circle at 84% 12%, rgba(255, 196, 112, 0.08), transparent 28%),
+          radial-gradient(circle at 50% 88%, rgba(63, 209, 173, 0.08), transparent 30%),
+          linear-gradient(180deg, #020202 0%, #050506 34%, #070809 100%);
+        color: var(--text);
+        font-family: var(--sans);
+        line-height: 1.65;
+        overflow-x: hidden;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+      }
+
+      .skip-link {
+        position: absolute;
+        left: -999px;
+        top: 12px;
+        z-index: 50;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgba(18, 20, 25, 0.96);
+        border: 1px solid var(--line-strong);
+      }
+
+      .skip-link:focus {
+        left: 12px;
+      }
+
+      .bg-layer {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        overflow: hidden;
+      }
+
+      .bg-noise,
+      .bg-grid,
+      .bg-vignette,
+      .bg-orb {
+        position: absolute;
+      }
+
+      .bg-grid {
+        inset: 0;
+        opacity: 0.16;
+        background-image:
+          linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+        background-size: 64px 64px;
+        mask-image: radial-gradient(circle at 50% 12%, #000 12%, transparent 72%);
+      }
+
+      .bg-noise {
+        inset: 0;
+        opacity: 0.08;
+        mix-blend-mode: soft-light;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.88' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+      }
+
+      .bg-vignette {
+        inset: 0;
+        background: radial-gradient(circle at 50% 0%, transparent, rgba(0, 0, 0, 0.36) 68%, rgba(0, 0, 0, 0.7));
+      }
+
+      .bg-orb {
+        border-radius: 999px;
+        filter: blur(72px);
+        opacity: 0.78;
+      }
+
+      .bg-orb.orb-a {
+        width: min(560px, 54vw);
+        height: min(340px, 36vw);
+        top: -80px;
+        left: -120px;
+        background: rgba(74, 123, 255, 0.16);
+        animation: drift-a 28s ease-in-out infinite;
+      }
+
+      .bg-orb.orb-b {
+        width: min(500px, 42vw);
+        height: min(320px, 32vw);
+        top: 220px;
+        right: -140px;
+        background: rgba(255, 191, 92, 0.12);
+        animation: drift-b 24s ease-in-out infinite;
+      }
+
+      .bg-orb.orb-c {
+        width: min(520px, 50vw);
+        height: min(280px, 28vw);
+        bottom: 120px;
+        left: 18%;
+        background: rgba(70, 208, 180, 0.11);
+        animation: drift-c 26s ease-in-out infinite;
+      }
+
+      @keyframes drift-a {
+        0%,
+        100% {
+          transform: translate3d(0, 0, 0) rotate(-12deg);
+        }
+        50% {
+          transform: translate3d(34px, 18px, 0) rotate(-7deg);
+        }
+      }
+
+      @keyframes drift-b {
+        0%,
+        100% {
+          transform: translate3d(0, 0, 0) rotate(14deg);
+        }
+        50% {
+          transform: translate3d(-30px, 24px, 0) rotate(18deg);
+        }
+      }
+
+      @keyframes drift-c {
+        0%,
+        100% {
+          transform: translate3d(0, 0, 0);
+        }
+        50% {
+          transform: translate3d(0, -24px, 0);
+        }
+      }
+
+      @keyframes line-draw {
+        from {
+          transform: scaleX(0);
+          opacity: 0.4;
+        }
+        to {
+          transform: scaleX(1);
+          opacity: 1;
+        }
+      }
+
+      @keyframes metal-shift {
+        0%,
+        100% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+      }
+
+      @keyframes metal-sweep {
+        0% {
+          background-position: 220% 0;
+        }
+        100% {
+          background-position: -220% 0;
+        }
+      }
+
+      @keyframes pulse-down {
+        0%,
+        100% {
+          transform: translate(-50%, 0);
+          opacity: 0.45;
+        }
+        50% {
+          transform: translate(-50%, 8px);
+          opacity: 1;
+        }
+      }
+
+      @keyframes chip-float {
+        0%,
+        100% {
+          transform: translate3d(0, 0, 0);
+        }
+        50% {
+          transform: translate3d(0, -8px, 0);
+        }
+      }
+
+      @keyframes ring-spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .page {
+        position: relative;
+        z-index: 1;
+        width: var(--page);
+        margin: 0 auto;
+        padding: 22px 0 80px;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 4px 0 18px;
+      }
+
+      .logo {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .logo-mark {
+        width: 56px;
+        height: 56px;
+        flex-shrink: 0;
+        display: grid;
+        place-items: center;
+      }
+
+      .logo-mark img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: contain;
+        filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.22));
+      }
+
+      .logo-text strong,
+      h1,
+      h2,
+      h3 {
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .logo-text strong {
+        display: block;
+        font-size: 18px;
+      }
+
+      .logo-text span {
+        display: block;
+        margin-top: 2px;
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .top-links {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .nav-link {
+        padding: 9px 13px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--muted);
+        font-size: 13px;
+        transition:
+          transform 180ms ease,
+          border-color 180ms ease,
+          color 180ms ease,
+          background 180ms ease;
+      }
+
+      .nav-link:hover {
+        transform: translateY(-1px);
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.16);
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .nav-link.primary {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+      }
+
+      .hero-section {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);
+        gap: 24px;
+        align-items: stretch;
+        padding-top: 18px;
+        padding-bottom: 38px;
+      }
+
+      .shell {
+        position: relative;
+        overflow: hidden;
+        border-radius: var(--radius-xl);
+        border: 1px solid var(--line);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+        backdrop-filter: blur(18px) saturate(1.1);
+        -webkit-backdrop-filter: blur(18px) saturate(1.1);
+        box-shadow: var(--shadow);
+      }
+
+      .shell::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 24%);
+      }
+
+      .hero-copy {
+        padding: clamp(32px, 4.5vw, 46px);
+      }
+
+      .eyebrow,
+      .section-kicker,
+      .mini-label,
+      .step-no,
+      .tag,
+      .metric-label {
+        font-family: var(--mono);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.11);
+        background: rgba(255, 255, 255, 0.04);
+        color: rgba(245, 247, 251, 0.84);
+        font-size: 11px;
+      }
+
+      .eyebrow::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: linear-gradient(180deg, #ffffff, #b6bed3);
+        box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.05);
+      }
+
+      h1 {
+        margin: 28px 0 12px;
+        font-size: clamp(54px, 6vw, 92px);
+        line-height: 1.04;
+        text-wrap: balance;
+      }
+
+      .hero-accent {
+        position: relative;
+        display: inline-block;
+        color: rgba(245, 247, 251, 0.92);
+      }
+
+      .hero-accent::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -10px;
+        height: 12px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 210, 129, 0.7) 18%, rgba(255, 255, 255, 0.95) 52%, rgba(95, 144, 255, 0.5) 84%, rgba(255, 255, 255, 0));
+        transform-origin: left center;
+        animation: line-draw 850ms ease-out 380ms both;
+        filter: blur(0.4px);
+      }
+
+      .lead {
+        max-width: 64ch;
+        margin: 24px 0 0;
+        color: var(--muted);
+        font-size: clamp(17px, 2vw, 21px);
+        line-height: 1.56;
+      }
+
+      .hero-meta {
+        margin-top: 18px;
+        color: var(--faint);
+        font-size: 14px;
+      }
+
+      .cta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 28px;
+      }
+
+      .btn {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        min-height: 50px;
+        padding: 12px 18px;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        font-size: 15px;
+        font-weight: 700;
+        transition:
+          transform 220ms cubic-bezier(0.4, 0, 0.2, 1),
+          border-color 220ms ease,
+          box-shadow 220ms ease,
+          background 220ms ease;
+        overflow: hidden;
+      }
+
+      .btn:hover {
+        transform: translateY(-2px);
+      }
+
+      .btn:active {
+        transform: translateY(0) scale(0.985);
+      }
+
+      .btn-metal {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.16);
+        background: linear-gradient(135deg, #1c1d21, #34353b, #656873, #9093a2 45%, #b7bbca, #8d90a0 55%, #666975, #383941, #1b1c20);
+        background-size: 220% 220%;
+        animation: metal-shift 8s ease infinite;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.16),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.34),
+          0 12px 28px rgba(0, 0, 0, 0.34),
+          0 0 26px rgba(202, 207, 221, 0.08);
+      }
+
+      .btn-metal::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: linear-gradient(110deg, transparent 24%, rgba(255, 255, 255, 0.08) 44%, rgba(255, 255, 255, 0.22) 50%, rgba(255, 255, 255, 0.08) 56%, transparent 76%);
+        background-size: 300% 100%;
+        animation: metal-sweep 6s ease-in-out infinite;
+        pointer-events: none;
+      }
+
+      .btn-glass {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(255, 255, 255, 0.12);
+      }
+
+      .btn-glass:hover {
+        background: rgba(255, 255, 255, 0.09);
+        border-color: rgba(255, 255, 255, 0.18);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 30px;
+      }
+
+      .metric {
+        padding: 14px 16px;
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .metric-value {
+        display: block;
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .metric-label {
+        display: block;
+        margin-top: 5px;
+        color: var(--faint);
+        font-size: 11px;
+      }
+
+      .scroll-cue {
+        position: absolute;
+        left: 50%;
+        bottom: 14px;
+        transform: translateX(-50%);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .scroll-cue::after {
+        content: "↓";
+        position: relative;
+        animation: pulse-down 2.4s ease-in-out infinite;
+      }
+
+      .install-panel {
+        padding: 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .signal-board {
+        position: relative;
+        min-height: 164px;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background:
+          radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.07), transparent 48%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+        overflow: hidden;
+      }
+
+      .signal-board::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 28px 28px;
+        opacity: 0.28;
+      }
+
+      .signal-core {
+        position: absolute;
+        inset: 50% auto auto 50%;
+        width: 110px;
+        height: 110px;
+        transform: translate(-50%, -50%);
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.03) 55%, transparent 72%);
+        box-shadow: 0 0 40px rgba(110, 151, 255, 0.12);
+      }
+
+      .signal-core::before,
+      .signal-core::after {
+        content: "";
+        position: absolute;
+        inset: -18px;
+        border-radius: inherit;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .signal-core::after {
+        inset: -34px;
+        border-style: dashed;
+        animation: ring-spin 22s linear infinite;
+      }
+
+      .float-chip {
+        position: absolute;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        background: rgba(15, 16, 20, 0.74);
+        color: rgba(245, 247, 251, 0.86);
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        animation: chip-float 4s ease-in-out infinite;
+      }
+
+      .float-chip::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.92);
+      }
+
+      .float-chip.a {
+        top: 20px;
+        left: 18px;
+      }
+
+      .float-chip.b {
+        top: 28px;
+        right: 16px;
+        animation-delay: -1.4s;
+      }
+
+      .float-chip.c {
+        left: 24px;
+        bottom: 20px;
+        animation-delay: -2.6s;
+      }
+
+      .float-chip.d {
+        right: 18px;
+        bottom: 18px;
+        animation-delay: -0.8s;
+      }
+
+      .install-copy h2,
+      .section-head h2 {
+        margin: 0;
+        font-size: clamp(30px, 4vw, 50px);
+        line-height: 1;
+      }
+
+      .section-kicker,
+      .mini-label {
+        color: var(--faint);
+        font-size: 11px;
+      }
+
+      .install-copy p,
+      .section-head p,
+      .card-text,
+      .faq-body,
+      .panel-note,
+      .panel-list,
+      .prompt-text {
+        color: var(--muted);
+      }
+
+      .install-points {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .mini-card {
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .mini-card strong {
+        display: block;
+        font-size: 14px;
+      }
+
+      .mini-card span {
+        display: block;
+        margin-top: 4px;
+        color: var(--faint);
+        font-size: 12px;
+      }
+
+      .codewrap {
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        background: linear-gradient(180deg, rgba(12, 13, 16, 0.94), rgba(10, 11, 14, 0.88));
+        box-shadow: var(--shadow-soft);
+        overflow: hidden;
+      }
+
+      .codebar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .codebar span {
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .copybtn {
+        appearance: none;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+        border-radius: 999px;
+        padding: 7px 11px;
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition:
+          transform 160ms ease,
+          border-color 160ms ease,
+          background 160ms ease;
+      }
+
+      .copybtn:hover {
+        transform: translateY(-1px);
+        border-color: rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      pre {
+        margin: 0;
+        padding: 16px 16px 18px;
+        overflow: auto;
+      }
+
+      code,
+      pre {
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      code {
+        padding: 2px 6px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      pre code {
+        padding: 0;
+        background: transparent;
+        border: 0;
+        color: rgba(245, 247, 251, 0.94);
+      }
+
+      .hint {
+        margin: 0;
+        color: var(--faint);
+        font-size: 13px;
+      }
+
+      .section {
+        margin-top: 38px;
+        padding: clamp(28px, 4vw, 40px);
+      }
+
+      .section-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 22px;
+      }
+
+      .section-head p {
+        max-width: 54ch;
+        margin: 0;
+        font-size: 15px;
+      }
+
+      .feature-grid,
+      .process-grid,
+      .use-grid,
+      .stats-grid {
+        display: grid;
+        gap: 20px;
+      }
+
+      .feature-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .process-grid {
+        margin-top: 20px;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+      }
+
+      .use-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .spot-card {
+        --spot-x: 50%;
+        --spot-y: 50%;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .spot-card::before,
+      .spot-card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 220ms ease;
+      }
+
+      .spot-card::before {
+        background: radial-gradient(240px circle at var(--spot-x) var(--spot-y), rgba(255, 255, 255, 0.08), transparent 62%);
+      }
+
+      .spot-card::after {
+        inset: -1px;
+        border-radius: inherit;
+        padding: 1px;
+        background: radial-gradient(260px circle at var(--spot-x) var(--spot-y), rgba(255, 255, 255, 0.28), transparent 46%);
+        -webkit-mask:
+          linear-gradient(#000 0 0) content-box,
+          linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+        mask:
+          linear-gradient(#000 0 0) content-box,
+          linear-gradient(#000 0 0);
+        mask-composite: exclude;
+      }
+
+      .spot-card:hover::before,
+      .spot-card:hover::after {
+        opacity: 1;
+      }
+
+      .feature-card,
+      .process-card,
+      .use-card,
+      .stat-card {
+        position: relative;
+        padding: 22px;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.04);
+        transition:
+          transform 220ms ease,
+          border-color 220ms ease,
+          background 220ms ease,
+          box-shadow 220ms ease;
+      }
+
+      .feature-card:hover,
+      .process-card:hover,
+      .use-card:hover,
+      .stat-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.055);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .feature-card > *,
+      .process-card > *,
+      .use-card > *,
+      .stat-card > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      .card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .step-no,
+      .tag {
+        color: var(--faint);
+        font-size: 11px;
+      }
+
+      .feature-card h3,
+      .use-card h3,
+      .process-card h3,
+      .stat-card h3 {
+        margin: 18px 0 0;
+        font-size: 22px;
+        line-height: 1.15;
+      }
+
+      .card-text,
+      .process-card p,
+      .stat-card p {
+        margin: 12px 0 0;
+        font-size: 14px;
+      }
+
+      .card-tagline {
+        margin-top: 16px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .tabs {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        padding: 8px;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .tab-btn {
+        appearance: none;
+        border: 1px solid transparent;
+        border-radius: 12px;
+        padding: 12px 14px;
+        background: transparent;
+        color: var(--muted);
+        font-weight: 700;
+        cursor: pointer;
+        transition:
+          transform 180ms ease,
+          background 180ms ease,
+          color 180ms ease,
+          border-color 180ms ease;
+      }
+
+      .tab-btn:hover {
+        transform: translateY(-1px);
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .tab-btn[aria-selected="true"] {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .panel-stack {
+        margin-top: 14px;
+      }
+
+      .panel {
+        display: none;
+        padding: 22px;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .panel.active {
+        display: block;
+      }
+
+      .panel-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 0.9fr) minmax(260px, 0.7fr);
+        gap: 18px;
+        align-items: start;
+      }
+
+      .panel-list {
+        margin: 0;
+        padding-left: 18px;
+        font-size: 14px;
+      }
+
+      .panel-list li + li {
+        margin-top: 8px;
+      }
+
+      .panel-note {
+        margin: 12px 0 0;
+        font-size: 13px;
+      }
+
+      .prompt-box {
+        margin-top: 16px;
+        padding: 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .prompt-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .prompt-text {
+        margin: 10px 0 0;
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.7;
+      }
+
+      .faq-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      details {
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.04);
+        padding: 0 18px;
+      }
+
+      summary {
+        position: relative;
+        list-style: none;
+        cursor: pointer;
+        padding: 18px 30px 18px 0;
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      summary::-webkit-details-marker {
+        display: none;
+      }
+
+      summary::after {
+        content: "+";
+        position: absolute;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--faint);
+        font-size: 20px;
+        transition: transform 180ms ease;
+      }
+
+      details[open] summary::after {
+        transform: translateY(-50%) rotate(45deg);
+      }
+
+      .faq-body {
+        padding: 0 0 18px;
+        font-size: 14px;
+      }
+
+      footer {
+        margin-top: 24px;
+        padding: 22px;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .footer-grid {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        flex-wrap: wrap;
+      }
+
+      .footer-copy strong {
+        display: block;
+        font-size: 16px;
+      }
+
+      .footer-copy span {
+        display: block;
+        margin-top: 4px;
+        color: var(--faint);
+        font-size: 13px;
+      }
+
+      .footer-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .footer-links a {
+        padding: 9px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .footer-links a:hover {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.14);
+      }
+
+      [data-reveal] {
+        opacity: 0;
+        transform: translateY(36px);
+        transition:
+          opacity 620ms ease,
+          transform 620ms ease;
+      }
+
+      [data-reveal].is-visible {
         opacity: 1;
         transform: translateY(0);
       }
-    }
 
-    section {
-      background: var(--bg-soft);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: clamp(18px, 3.6vw, 28px);
-      box-shadow: 0 8px 18px rgba(16, 36, 63, 0.05);
-      margin-bottom: 18px;
-    }
-
-    h2 {
-      margin: 0 0 10px;
-      font-size: clamp(22px, 3.1vw, 28px);
-      letter-spacing: 0.3px;
-    }
-
-    p {
-      margin: 10px 0;
-      color: var(--ink-muted);
-    }
-
-    ul,
-    ol {
-      margin: 10px 0;
-      padding-left: 22px;
-      color: var(--ink-muted);
-    }
-
-    li {
-      margin: 6px 0;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 12px;
-      margin-top: 14px;
-    }
-
-    .feature {
-      background: #f7fbff;
-      border: 1px solid #dce9ff;
-      border-radius: 14px;
-      padding: 12px 14px;
-      color: var(--ink);
-      font-size: 15px;
-    }
-
-    .code-wrap {
-      background: #0d1c33;
-      color: #e6efff;
-      border-radius: 14px;
-      overflow: auto;
-      border: 1px solid #233f66;
-      margin-top: 12px;
-    }
-
-    pre {
-      margin: 0;
-      padding: 14px 16px;
-      font-family: "SFMono-Regular", Menlo, Consolas, monospace;
-      font-size: 13px;
-      line-height: 1.55;
-      white-space: pre;
-    }
-
-    code {
-      font-family: "SFMono-Regular", Menlo, Consolas, monospace;
-      background: var(--brand-soft);
-      color: #11386f;
-      border-radius: 8px;
-      padding: 2px 6px;
-      font-size: 90%;
-    }
-
-    .note {
-      margin-top: 10px;
-      padding: 10px 12px;
-      background: #eefaf5;
-      border: 1px solid #cbeedf;
-      color: #14593f;
-      border-radius: 10px;
-    }
-
-    .qa {
-      margin-top: 8px;
-      border-top: 1px dashed #d8e4f8;
-      padding-top: 8px;
-    }
-
-    .qa strong {
-      color: var(--ink);
-    }
-
-    footer {
-      text-align: center;
-      color: #5d6f8c;
-      font-size: 13px;
-      padding: 6px 0 28px;
-    }
-
-    @media (max-width: 720px) {
-      .hero {
-        padding-top: 34px;
+      #toast {
+        position: fixed;
+        left: 50%;
+        bottom: 18px;
+        transform: translateX(-50%);
+        padding: 10px 13px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(16, 18, 22, 0.94);
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        box-shadow: var(--shadow-soft);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 180ms ease;
+        z-index: 60;
       }
 
-      .hero-links {
-        flex-direction: column;
+      @media (max-width: 1080px) {
+        .hero-section,
+        .panel-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .feature-grid,
+        .use-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .process-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
       }
 
-      .hero-links a {
-        text-align: center;
+      @media (max-width: 760px) {
+        .page {
+          width: min(1180px, calc(100vw - 22px));
+        }
+
+        .topbar,
+        .section-head,
+        .footer-grid {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .top-links,
+        .footer-links {
+          justify-content: flex-start;
+        }
+
+        .metrics,
+        .feature-grid,
+        .process-grid,
+        .use-grid,
+        .stats-grid,
+        .install-points,
+        .tabs {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-copy,
+        .section,
+        .install-panel,
+        .panel {
+          padding: 22px 18px;
+        }
+
+        .logo-text span {
+          display: none;
+        }
       }
-    }
-  </style>
-</head>
-<body>
-  <header class="hero">
-    <div class="container">
-      <div class="hero-card">
-        <span class="tag">Nitan MCP 项目主页</span>
-        <h1>连接论坛能力与智能体工作流</h1>
-        <p>
-          Nitan 是基于 Discourse MCP 深度改造的项目，面向 uscardforum 使用场景，提供稳定的 MCP
-          工具能力，并同时发布可复用的 nitan Skill。
-        </p>
-        <div class="hero-links">
-          <a href="https://github.com/your-org/nitan-mcp" target="_blank" rel="noreferrer">GitHub 链接（占位）</a>
-          <a href="https://www.npmjs.com/package/@nitansde/mcp" target="_blank" rel="noreferrer">NPM 包页面</a>
-          <a href="https://www.uscardforum.com/t/topic/450599" target="_blank" rel="noreferrer">uscardforum 讨论贴</a>
-        </div>
-      </div>
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+
+        .bg-orb,
+        .signal-core::after,
+        .float-chip,
+        .btn-metal,
+        .btn-metal::before,
+        .scroll-cue::after,
+        .hero-accent::after {
+          animation: none;
+        }
+
+        .nav-link,
+        .btn,
+        .feature-card,
+        .process-card,
+        .use-card,
+        .stat-card,
+        .copybtn,
+        .tab-btn,
+        .spot-card::before,
+        .spot-card::after,
+        [data-reveal] {
+          transition: none;
+        }
+
+        [data-reveal] {
+          opacity: 1;
+          transform: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">跳到正文</a>
+
+    <div class="bg-layer" aria-hidden="true">
+      <div class="bg-grid"></div>
+      <div class="bg-orb orb-a"></div>
+      <div class="bg-orb orb-b"></div>
+      <div class="bg-orb orb-c"></div>
+      <div class="bg-noise"></div>
+      <div class="bg-vignette"></div>
     </div>
-  </header>
 
-  <main class="container">
-    <section id="intro">
-      <h2>项目简介</h2>
-      <p>
-        Nitan 项目用于把 Discourse 论坛能力暴露为 MCP 工具，便于 Claude Desktop 等客户端按统一接口完成搜索、阅读与自动化流程。项目默认以只读模式安全运行，也支持在满足权限条件下开启写入能力。
-      </p>
-      <p>
-        该仓库同时提供 Skill（名称为 nitan）用于增强智能体执行体验，Skill 为附加能力，不改变 MCP 运行时行为。
-      </p>
-    </section>
+    <main class="page" id="content">
+      <header class="topbar">
+        <a class="logo" href="#top" aria-label="Nitan MCP">
+          <span class="logo-mark"><img src="logo.png" alt="" /></span>
+          <span class="logo-text">
+            <strong>Nitan MCP</strong>
+            <span>USCardForum Toolkit</span>
+          </span>
+        </a>
 
-    <section id="capabilities">
-      <h2>核心能力</h2>
-      <div class="grid">
-        <div class="feature">论坛数据工具：搜索、读取话题、读取帖子、分类与标签浏览。</div>
-        <div class="feature">站点模式：支持固定站点模式或动态选择站点模式。</div>
-        <div class="feature">权限控制：默认只读，写入能力由参数和鉴权共同决定。</div>
-        <div class="feature">抗防护能力：Cloudflare 双策略自动回退，提升请求稳定性。</div>
-        <div class="feature">远程工具扩展：可按站点发现并注册远程工具。</div>
-        <div class="feature">Skill 支持：可打包并分发 nitan Skill，支持本地或文件导入。</div>
-      </div>
-    </section>
+        <nav class="top-links" aria-label="Primary">
+          <a class="nav-link" href="#capabilities">Capabilities</a>
+          <a class="nav-link" href="#quickstart">Quickstart</a>
+          <a class="nav-link" href="#cases">Use Cases</a>
+          <a class="nav-link" href="#faq">FAQ</a>
+          <a class="nav-link primary" href="#install">OpenClaw Skill</a>
+          <a class="nav-link" href="https://github.com/nitansde/nitan-mcp" target="_blank" rel="noreferrer">GitHub</a>
+          <a class="nav-link" href="https://www.npmjs.com/package/@nitansde/mcp" target="_blank" rel="noreferrer">NPM</a>
+          <a class="nav-link" href="https://www.uscardforum.com/t/topic/450599" target="_blank" rel="noreferrer">论坛贴</a>
+        </nav>
+      </header>
 
-    <section id="quick-start">
-      <h2>快速开始</h2>
-      <ol>
-        <li>准备环境：Node.js 18+，Python 3.7+，以及 pip3。</li>
-        <li>推荐直接运行：<code>npx -y @nitansde/mcp@latest</code>。</li>
-        <li>如需本地开发，执行以下命令：</li>
-      </ol>
-      <div class="code-wrap">
-        <pre><code>pnpm install
-pnpm build
-node dist/index.js</code></pre>
-      </div>
-      <p>如 Python 依赖未自动安装，可执行 <code>pip3 install -r requirements.txt</code>。</p>
-    </section>
+      <section class="hero-section" id="top">
+        <article class="shell hero-copy" data-reveal>
+          <div class="eyebrow">Project Homepage</div>
+          <h1>
+            Nitan MCP,<br />
+            <span class="hero-accent">forum automation that stays up.</span>
+          </h1>
+          <p class="lead">
+            面向 USCardForum 的发布级 MCP 工具集。把搜索、读帖、通知、热榜、话题筛选、登录态访问与
+            Cloudflare fallback，整理成一套适合真实自动化流程的稳定接口。
+          </p>
+          <p class="hero-meta">
+            覆盖 OpenClaw、Claude Desktop、MCPHub、Poke、云服务器与 Tailscale Funnel 等常见接入方式。
+          </p>
 
-    <section id="skill-install">
-      <h2>Skill 安装</h2>
-      <p>
-        Skill 名称为 <code>nitan</code>，可通过打包产物导入。当前准确产物路径为
-        <code>dist-skill/nitan.skill</code>。
-      </p>
-      <div class="code-wrap">
-        <pre><code>pnpm skill:pack
-# 输出：dist-skill/nitan.skill</code></pre>
-      </div>
-      <ul>
-        <li>方式一（推荐）：导入 <code>dist-skill/nitan.skill</code> 到 Skill 管理器。</li>
-        <li>方式二：复制 <code>skills/nitan/</code> 到本地 Skill 目录并重载。</li>
-      </ul>
-    </section>
+          <div class="cta-row">
+            <a class="btn btn-metal" href="#install">OpenClaw Skill</a>
+            <a class="btn btn-glass" href="#quickstart">Quickstart</a>
+            <a class="btn btn-glass" href="https://github.com/nitansde/nitan-mcp" target="_blank" rel="noreferrer">Star on GitHub</a>
+          </div>
 
-    <section id="mcp-config">
-      <h2>MCP 客户端配置示例</h2>
-      <p>以下示例展示名称为 <code>nitan</code> 的 MCP 服务器配置。</p>
-      <div class="code-wrap">
-        <pre><code>{
+          <div class="metrics" aria-label="Highlights">
+            <div class="metric">
+              <span class="metric-value">Node &gt;= 18</span>
+              <span class="metric-label">runtime floor</span>
+            </div>
+            <div class="metric">
+              <span class="metric-value">Login recommended</span>
+              <span class="metric-label">private boards · notifications</span>
+            </div>
+            <div class="metric">
+              <span class="metric-value">Poke / Claude / OpenClaw</span>
+              <span class="metric-label">popular clients in the thread</span>
+            </div>
+          </div>
+
+          <a class="scroll-cue" href="#capabilities">Keep Scrolling</a>
+        </article>
+
+        <aside class="shell install-panel" id="install" data-reveal>
+          <div class="signal-board" aria-hidden="true">
+            <div class="signal-core"></div>
+            <span class="float-chip a">search</span>
+            <span class="float-chip b">notify</span>
+            <span class="float-chip c">fallback</span>
+            <span class="float-chip d">doctor</span>
+          </div>
+
+          <div class="install-copy">
+            <div class="section-kicker">OpenClaw</div>
+            <h2>Skill 安装入口</h2>
+            <p>
+              OpenClaw 可直接导入 skill 使用。想先确认环境是否正常，先跑 <code>npx</code> + <code>doctor</code> 即可。
+            </p>
+          </div>
+
+          <div class="codewrap">
+            <div class="codebar">
+              <span>Pack Skill</span>
+              <button class="copybtn" type="button" data-copy-target="#skill-pack">Copy</button>
+            </div>
+            <pre><code id="skill-pack">pnpm skill:pack
+# output: dist-skill/nitan.skill</code></pre>
+          </div>
+
+          <div class="install-points">
+            <div class="mini-card">
+              <strong>Pack once</strong>
+              <span>生成 <code>dist-skill/nitan.skill</code></span>
+            </div>
+            <div class="mini-card">
+              <strong>Import</strong>
+              <span>导入 OpenClaw Skill manager</span>
+            </div>
+            <div class="mini-card">
+              <strong>Run</strong>
+              <span><code>npx -y @nitansde/mcp@latest</code></span>
+            </div>
+            <div class="mini-card">
+              <strong>Verify</strong>
+              <span>用 <code>doctor</code> 做一次自检</span>
+            </div>
+          </div>
+
+          <div class="codewrap">
+            <div class="codebar">
+              <span>Direct Run</span>
+              <button class="copybtn" type="button" data-copy-target="#doctor-run">Copy</button>
+            </div>
+            <pre><code id="doctor-run">npx -y @nitansde/mcp@latest
+npx -y @nitansde/mcp@latest doctor</code></pre>
+          </div>
+
+          <p class="hint">导入 <code>dist-skill/nitan.skill</code> 后即可在 OpenClaw 里直接调用。</p>
+        </aside>
+      </section>
+
+      <section class="shell section" id="capabilities" data-reveal>
+        <div class="section-head">
+          <div>
+            <div class="section-kicker">Capabilities</div>
+            <h2>把论坛操作变成稳定工具调用</h2>
+          </div>
+          <p>基于官方 Discourse MCP 扩展，补上更适合泥潭使用的登录、通知和论坛工具。</p>
+        </div>
+
+        <div class="feature-grid" role="list">
+          <article class="feature-card spot-card" role="listitem" data-reveal>
+            <div class="card-head">
+              <span class="step-no">01</span>
+              <span class="tag">Tools</span>
+            </div>
+            <h3>论坛工具链</h3>
+            <p class="card-text">搜索主题、读取帖子、搜索后直接综述，是最基础也最高频的一组动作。</p>
+            <div class="card-tagline">search · read · list · filter</div>
+          </article>
+
+          <article class="feature-card spot-card" role="listitem" data-reveal>
+            <div class="card-head">
+              <span class="step-no">02</span>
+              <span class="tag">Auth</span>
+            </div>
+            <h3>登录与私有能力</h3>
+            <p class="card-text">登录后才能稳定读取通知、私有板块和更多个人相关内容；不登录可以用，但功能会缺一截。</p>
+            <div class="card-tagline">env · interactive login</div>
+          </article>
+
+          <article class="feature-card spot-card" role="listitem" data-reveal>
+            <div class="card-head">
+              <span class="step-no">03</span>
+              <span class="tag">Reliability</span>
+            </div>
+            <h3>Cloudflare 双策略</h3>
+            <p class="card-text">优先 cloudscraper，失败自动切换 curl_cffi；macOS 还能继续走浏览器 fallback。</p>
+            <div class="card-tagline">cloudscraper · curl_cffi · playwright</div>
+          </article>
+
+          <article class="feature-card spot-card" role="listitem" data-reveal>
+            <div class="card-head">
+              <span class="step-no">04</span>
+              <span class="tag">Ranking</span>
+            </div>
+            <h3>排行与热帖</h3>
+            <p class="card-text">可以拉每日 / 周 / 月 / 年排行，也能直接看热帖，适合做日报和自动提醒。</p>
+            <div class="card-tagline">daily · weekly · monthly · yearly · hot</div>
+          </article>
+
+          <article class="feature-card spot-card" role="listitem" data-reveal>
+            <div class="card-head">
+              <span class="step-no">05</span>
+              <span class="tag">Users</span>
+            </div>
+            <h3>用户动态追踪</h3>
+            <p class="card-text">查看某个用户最近回帖，配合 Poke 或定时任务，可以实现“这个人一发言就提醒我”。</p>
+            <div class="card-tagline">user activity · alerts</div>
+          </article>
+
+          <article class="feature-card spot-card" role="listitem" data-reveal>
+            <div class="card-head">
+              <span class="step-no">06</span>
+              <span class="tag">Categories</span>
+            </div>
+            <h3>板块巡检与新工具</h3>
+            <p class="card-text">支持查看某个板块最新帖子；v1.2.0 还补了精彩话题和难绷话题两个新入口。</p>
+            <div class="card-tagline">latest posts · excellent · cringe</div>
+          </article>
+        </div>
+
+        <div class="process-grid" aria-label="Deployment flow">
+          <article class="process-card spot-card" data-reveal>
+            <span class="step-no">01 / OpenClaw</span>
+            <h3>Let the agent do it</h3>
+            <p>OpenClaw 可以直接接入，适合先跑通再细调。</p>
+          </article>
+          <article class="process-card spot-card" data-reveal>
+            <span class="step-no">02 / Desktop</span>
+            <h3>Claude local setup</h3>
+            <p>本地部署最直观：打开 Claude Desktop 的 Developer 配置文件，写入 <code>npx</code> 配置后重启。</p>
+          </article>
+          <article class="process-card spot-card" data-reveal>
+            <span class="step-no">03 / MCPHub</span>
+            <h3>NAS or Linux server</h3>
+            <p>适合 NAS 和 Linux Server：STDIO + <code>npx</code> + Bearer Token + logs 排错。</p>
+          </article>
+          <article class="process-card spot-card" data-reveal>
+            <span class="step-no">04 / Cloud</span>
+            <h3>Cheap VM is enough</h3>
+            <p>便宜云主机即可，重点是端口、镜像和安全设置。</p>
+          </article>
+          <article class="process-card spot-card" data-reveal>
+            <span class="step-no">05 / Endpoint</span>
+            <h3>Expose safely</h3>
+            <p>公网接入时建议反向代理或 Tailscale Funnel；对外地址通常是 <code>/mcp/nitan</code>。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="shell section" id="quickstart" data-reveal>
+        <div class="section-head">
+          <div>
+            <div class="section-kicker">Quickstart</div>
+            <h2>按环境快速接入</h2>
+          </div>
+          <p>本地、MCPHub 和云端三条常见路径都能直接复制使用。</p>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="Quickstart Tabs">
+          <button class="tab-btn" id="tab-mac" type="button" role="tab" aria-selected="true" aria-controls="panel-mac" tabindex="0" data-tab="mac">macOS</button>
+          <button class="tab-btn" id="tab-win" type="button" role="tab" aria-selected="false" aria-controls="panel-win" tabindex="-1" data-tab="win">Windows</button>
+          <button class="tab-btn" id="tab-linux" type="button" role="tab" aria-selected="false" aria-controls="panel-linux" tabindex="-1" data-tab="linux">NAS / Linux</button>
+          <button class="tab-btn" id="tab-cloud" type="button" role="tab" aria-selected="false" aria-controls="panel-cloud" tabindex="-1" data-tab="cloud">Cloud</button>
+        </div>
+
+        <div class="panel-stack">
+          <article class="panel active" id="panel-mac" role="tabpanel" aria-labelledby="tab-mac" data-panel="mac" tabindex="0">
+            <div class="panel-grid">
+              <div>
+                <ol class="panel-list">
+                  <li>先装 Claude Desktop，在 Developer 里打开配置文件。</li>
+                  <li>把下面这段 <code>nitan</code> 配置写进去；要登录就把用户名密码一起填上。</li>
+                  <li>重启 Claude Desktop，connector 里能看到 nitan 就算接好了。</li>
+                </ol>
+                <p class="panel-note">本地部署通常几分钟就能跑通；macOS 体验最完整。</p>
+              </div>
+
+              <div class="codewrap">
+                <div class="codebar">
+                  <span>Claude Desktop Config</span>
+                  <button class="copybtn" type="button" data-copy-target="#qs-mac">Copy</button>
+                </div>
+                <pre><code id="qs-mac">{
   "mcpServers": {
     "nitan": {
       "command": "npx",
       "args": ["-y", "@nitansde/mcp@latest"],
       "env": {
-        "NITAN_USERNAME": "你的用户名（可选）",
-        "NITAN_PASSWORD": "你的密码（可选）",
-        "TIMEZONE": "America/New_York"
+        "NITAN_USERNAME": "YOUR_USERNAME",
+        "NITAN_PASSWORD": "YOUR_PASSWORD"
       }
     }
   }
 }</code></pre>
-      </div>
-      <p class="note">
-        说明：<code>NITAN_USERNAME</code> 与 <code>NITAN_PASSWORD</code> 为可选变量；不填写时可使用公开只读能力。<code>TIMEZONE</code>
-        用于指定时区，未设置时默认使用本地时钟。
-      </p>
-    </section>
+              </div>
+            </div>
+          </article>
 
-    <section id="faq">
-      <h2>常见问题</h2>
-      <div class="qa">
-        <p><strong>问：</strong>不配置账号密码可以用吗？</p>
-        <p><strong>答：</strong>可以，公开内容的只读访问可直接使用；需要受限能力时再配置账号密码。</p>
-      </div>
-      <div class="qa">
-        <p><strong>问：</strong>Cloudflare 相关功能失效怎么办？</p>
-        <p><strong>答：</strong>先确认 Python 依赖已安装，再检查运行环境中的 Python 路径是否可用。</p>
-      </div>
-      <div class="qa">
-        <p><strong>问：</strong>Skill 会改变 MCP 服务行为吗？</p>
-        <p><strong>答：</strong>不会，Skill 为附加能力，MCP 运行逻辑保持不变。</p>
-      </div>
-    </section>
+          <article class="panel" id="panel-win" role="tabpanel" aria-labelledby="tab-win" data-panel="win" tabindex="0" hidden>
+            <div class="panel-grid">
+              <div>
+                <ol class="panel-list">
+                  <li>Windows 本地部署同样走 Claude Desktop + <code>npx</code> 配置。</li>
+                  <li>如果 Python 在 venv / conda 里，优先把依赖装好，必要时再额外传 <code>--python_path</code>。</li>
+                  <li>遇到报错先看完整日志，不要只截最后一行通用错误码。</li>
+                </ol>
+                <p class="panel-note">Windows 重点检查 Python 路径和依赖，尤其是 <code>curl_cffi</code> 相关报错。</p>
+              </div>
 
-    <section id="release">
-      <h2>发布信息</h2>
-      <ul>
-        <li>NPM 发布流程保持不变，包名为 <code>@nitansde/mcp</code>。</li>
-        <li>发布版本时建议同步上传 <code>dist-skill/nitan.skill</code> 作为 Skill 产物。</li>
-        <li>项目链接占位：GitHub、NPM、uscardforum 讨论贴可按实际地址替换。</li>
-      </ul>
-    </section>
-  </main>
+              <div class="codewrap">
+                <div class="codebar">
+                  <span>PowerShell</span>
+                  <button class="copybtn" type="button" data-copy-target="#qs-win">Copy</button>
+                </div>
+                <pre><code id="qs-win">py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+npx -y @nitansde/mcp@latest --python_path C:\path\to\python.exe</code></pre>
+              </div>
+            </div>
+          </article>
 
-  <footer>
-    Nitan 项目主页示例 · 适配桌面与移动端
-  </footer>
-</body>
+          <article class="panel" id="panel-linux" role="tabpanel" aria-labelledby="tab-linux" data-panel="linux" tabindex="0" hidden>
+            <div class="panel-grid">
+              <div>
+                <ol class="panel-list">
+                  <li>NAS / Linux 通常先用 Docker 跑 MCPHub。</li>
+                  <li>在 MCPHub 里新增一个 STDIO server，command 填 <code>npx</code>，args 填包名。</li>
+                  <li>保存后 MCPHub 会自动安装并启动，出错就去左侧 logs 看完整日志。</li>
+                </ol>
+                <p class="panel-note">建议开启 Bearer Token，并补上 <code>TIMEZONE</code>；对外地址通常是 <code>.../mcp/nitan</code>。</p>
+              </div>
+
+              <div class="codewrap">
+                <div class="codebar">
+                  <span>MCPHub Fields</span>
+                  <button class="copybtn" type="button" data-copy-target="#qs-linux">Copy</button>
+                </div>
+                <pre><code id="qs-linux">Server Name: nitan
+Server Type: STDIO
+Command: npx
+Arguments: -y @nitansde/mcp@latest
+
+Environment Variables:
+NITAN_USERNAME=your_id
+NITAN_PASSWORD=your_password
+TIMEZONE=America/Los_Angeles</code></pre>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel" id="panel-cloud" role="tabpanel" aria-labelledby="tab-cloud" data-panel="cloud" tabindex="0" hidden>
+            <div class="panel-grid">
+              <div>
+                <ol class="panel-list">
+                  <li>GCP free tier + Gemini CLI + MCPHub 也能跑，性能要求不高。</li>
+                  <li>先放行端口（示例里是 13000），再让 Gemini CLI 帮你装 Docker 和 MCPHub。</li>
+                  <li>部署好后一定要改掉默认 admin / admin123，并开启 Bearer Authentication。</li>
+                </ol>
+                <p class="panel-note">1GB 内存的小机器建议把 swap 提高到 4GB。</p>
+              </div>
+
+              <div class="codewrap">
+                <div class="codebar">
+                  <span>Gemini CLI Prompt</span>
+                  <button class="copybtn" type="button" data-copy-target="#qs-cloud">Copy</button>
+                </div>
+                <pre><code id="qs-cloud">install and run docker image samanhappy/mcphub \
+with port 13000:3000 on VM &lt;your-vm-name&gt;</code></pre>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="shell section" id="assistants" data-reveal>
+        <div class="section-head">
+          <div>
+            <div class="section-kicker">Assistants</div>
+            <h2>论坛里最常见的接入组合</h2>
+          </div>
+          <p>常见组合主要是 Poke、Claude Desktop、OpenClaw，以及少量 Perplexity / Antigravity 用法。</p>
+        </div>
+
+        <div class="stats-grid" role="list">
+          <article class="stat-card spot-card" role="listitem" data-reveal>
+            <div class="card-head">
+              <span class="step-no">Poke</span>
+              <span class="tag">alerts</span>
+            </div>
+            <h3>短信提醒流</h3>
+            <p>Poke 很适合做每日简报、消息提醒和用户回帖追踪。</p>
+          </article>
+
+          <article class="stat-card spot-card" role="listitem" data-reveal>
+            <div class="card-head">
+              <span class="step-no">Claude</span>
+              <span class="tag">desktop</span>
+            </div>
+            <h3>最容易本地跑通</h3>
+            <p>Claude Desktop 最容易本地跑通，免费 plan 也能接 MCP。</p>
+          </article>
+
+          <article class="stat-card spot-card" role="listitem" data-reveal>
+            <div class="card-head">
+              <span class="step-no">OpenClaw+</span>
+              <span class="tag">others</span>
+            </div>
+            <h3>OpenClaw、Perplexity、Antigravity</h3>
+            <p>OpenClaw 可直接使用；Perplexity Pro 也有人跑通，但请求过快时可能触发封 IP。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="shell section" id="cases" data-reveal>
+        <div class="section-head">
+          <div>
+            <div class="section-kicker">Use Cases</div>
+            <h2>直接复制进自动化工作流</h2>
+          </div>
+          <p>下面这些 prompt 适合日报、监控、摘要和定向追踪。</p>
+        </div>
+
+        <div class="use-grid" role="list">
+          <article class="use-card spot-card" role="listitem" data-reveal>
+            <div class="card-head">
+              <span class="step-no">Digest</span>
+              <span class="tag">Daily</span>
+            </div>
+            <h3>每日热帖简报</h3>
+            <p class="card-text">按天抓取 hot / excellent，输出标题、摘要与链接。</p>
+            <div class="prompt-box">
+              <div class="prompt-head">
+                <span class="mini-label">Prompt</span>
+                <button class="copybtn" type="button" data-copy-text="每天早上 8 点生成昨日热帖简报，格式为标题 + 3 行摘要 + 链接。">Copy</button>
+              </div>
+              <p class="prompt-text">每天早上 8 点生成昨日热帖简报，格式为标题 + 3 行摘要 + 链接。</p>
+            </div>
+          </article>
+
+          <article class="use-card spot-card" role="listitem" data-reveal>
+            <div class="card-head">
+              <span class="step-no">Notify</span>
+              <span class="tag">Unread</span>
+            </div>
+            <h3>通知聚合提醒</h3>
+            <p class="card-text">读取未读通知，按优先级做一句话摘要。</p>
+            <div class="prompt-box">
+              <div class="prompt-head">
+                <span class="mini-label">Prompt</span>
+                <button class="copybtn" type="button" data-copy-text="检查未读通知并做一句话摘要，高优先级通知单独标记。">Copy</button>
+              </div>
+              <p class="prompt-text">检查未读通知并做一句话摘要，高优先级通知单独标记。</p>
+            </div>
+          </article>
+
+          <article class="use-card spot-card" role="listitem" data-reveal>
+            <div class="card-head">
+              <span class="step-no">Watch</span>
+              <span class="tag">Keywords</span>
+            </div>
+            <h3>关键词监控</h3>
+            <p class="card-text">持续跟踪指定关键词新帖，发现时即时回传链接与要点。</p>
+            <div class="prompt-box">
+              <div class="prompt-head">
+                <span class="mini-label">Prompt</span>
+                <button class="copybtn" type="button" data-copy-text="每 2 小时搜索 amex retention，有新帖时发送链接与要点。">Copy</button>
+              </div>
+              <p class="prompt-text">每 2 小时搜索 amex retention，有新帖时发送链接与要点。</p>
+            </div>
+          </article>
+
+          <article class="use-card spot-card" role="listitem" data-reveal>
+            <div class="card-head">
+              <span class="step-no">Users</span>
+              <span class="tag">Tracking</span>
+            </div>
+            <h3>用户动态追踪</h3>
+            <p class="card-text">关注指定用户的新回帖，并过滤低信息量内容。</p>
+            <div class="prompt-box">
+              <div class="prompt-head">
+                <span class="mini-label">Prompt</span>
+                <button class="copybtn" type="button" data-copy-text="每日检查目标用户新回帖，仅保留高价值信息并汇总。">Copy</button>
+              </div>
+              <p class="prompt-text">每日检查目标用户新回帖，仅保留高价值信息并汇总。</p>
+            </div>
+          </article>
+
+          <article class="use-card spot-card" role="listitem" data-reveal>
+            <div class="card-head">
+              <span class="step-no">Private</span>
+              <span class="tag">Login State</span>
+            </div>
+            <h3>私有版块摘要</h3>
+            <p class="card-text">在登录态可用时读取私有主题，整理出简报和后续动作。</p>
+            <div class="prompt-box">
+              <div class="prompt-head">
+                <span class="mini-label">Prompt</span>
+                <button class="copybtn" type="button" data-copy-text="读取我可见的私有通知与主题，只输出新增内容和后续需要处理的事项。">Copy</button>
+              </div>
+              <p class="prompt-text">读取我可见的私有通知与主题，只输出新增内容和后续需要处理的事项。</p>
+            </div>
+          </article>
+
+          <article class="use-card spot-card" role="listitem" data-reveal>
+            <div class="card-head">
+              <span class="step-no">Ops</span>
+              <span class="tag">Filter</span>
+            </div>
+            <h3>话题筛选巡检</h3>
+            <p class="card-text">按分类、标签和时间窗口巡检主题，适合专题化监控。</p>
+            <div class="prompt-box">
+              <div class="prompt-head">
+                <span class="mini-label">Prompt</span>
+                <button class="copybtn" type="button" data-copy-text="每天检查指定 category 和 tag 的新话题，输出标题、发布时间和一句话判断。">Copy</button>
+              </div>
+              <p class="prompt-text">每天检查指定 category 和 tag 的新话题，输出标题、发布时间和一句话判断。</p>
+            </div>
+          </article>
+
+          <article class="use-card spot-card" role="listitem" data-reveal>
+            <div class="card-head">
+              <span class="step-no">v1.2.0</span>
+              <span class="tag">Excellent</span>
+            </div>
+            <h3>订阅精彩 / 难绷话题</h3>
+            <p class="card-text">每天检查新的精彩或难绷话题并自动通知。</p>
+            <div class="prompt-box">
+              <div class="prompt-head">
+                <span class="mini-label">Prompt</span>
+                <button class="copybtn" type="button" data-copy-text="现在你可以用 nitan mcp 获取到最新的精彩话题和难绷的话题了。每天检查一次，当天如果有新的精彩的话题或者难绷的话题，帮我总结好内容并通知我，需要附上链接。">Copy</button>
+              </div>
+              <p class="prompt-text">现在你可以用 nitan mcp 获取到最新的精彩话题和难绷的话题了。每天检查一次，当天如果有新的精彩的话题或者难绷的话题，帮我总结好内容并通知我，需要附上链接。</p>
+            </div>
+          </article>
+
+          <article class="use-card spot-card" role="listitem" data-reveal>
+            <div class="card-head">
+              <span class="step-no">Fun</span>
+              <span class="tag">Experimental</span>
+            </div>
+            <h3>AI 相亲 / 用户画像</h3>
+            <p class="card-text">可以按用户画像做一些偏娱乐的探索式玩法。</p>
+            <div class="prompt-box">
+              <div class="prompt-head">
+                <span class="mini-label">Prompt</span>
+                <button class="copybtn" type="button" data-copy-text="如果要从论坛的用户中找出适合 XXX 的女友（男友）的人选，有哪五个？请说明理由并给出相关帖子线索。">Copy</button>
+              </div>
+              <p class="prompt-text">如果要从论坛的用户中找出适合 XXX 的女友（男友）的人选，有哪五个？请说明理由并给出相关帖子线索。</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="shell section" id="faq" data-reveal>
+        <div class="section-head">
+          <div>
+            <div class="section-kicker">FAQ</div>
+            <h2>先看这些，再开始排障</h2>
+          </div>
+          <p>先看这些高频问题；更完整的说明见 README 和论坛贴。</p>
+        </div>
+
+        <div class="faq-list">
+          <details data-reveal>
+            <summary>为什么官方 Discourse MCP 不够，需要单独做 Nitan MCP？</summary>
+            <div class="faq-body">官方版本偏通用。Nitan MCP 在它的基础上补了登录、通知和更多论坛专用工具。</div>
+          </details>
+
+          <details data-reveal>
+            <summary>不登录也能用吗？</summary>
+            <div class="faq-body">能用，但会少很多能力：私有板块、通知，以及部分高频访问场景。若账号开启二步验证，请先关闭。</div>
+          </details>
+
+          <details data-reveal>
+            <summary>为什么会出现 403 / Cloudflare challenge？</summary>
+            <div class="faq-body">先确认 Python 依赖与网络环境。系统会先走 cloudscraper，再自动回退 curl_cffi；在 macOS 还可进入浏览器 fallback。</div>
+          </details>
+
+          <details data-reveal>
+            <summary>云服务器是不是更容易被 Cloudflare / CSRF 卡住？</summary>
+            <div class="faq-body">是。云 IP 更容易遇到 403 / CSRF；本地电脑、NAS 或家宽网络通常更稳。</div>
+          </details>
+
+          <details data-reveal>
+            <summary>not_logged_in 导致通知不可用，如何处理？</summary>
+            <div class="faq-body">通知属于登录态能力。配置 <code>NITAN_USERNAME</code> 与 <code>NITAN_PASSWORD</code>，或通过 interactive login 完成登录。</div>
+          </details>
+
+          <details data-reveal>
+            <summary>macOS 报 Playwright missing 怎么修复？</summary>
+            <div class="faq-body">执行 <code>npm install --no-save playwright</code>，再执行 <code>npx playwright install chromium</code>，最后运行 <code>doctor</code> 验证。</div>
+          </details>
+
+          <details data-reveal>
+            <summary><code>Python curl_cffi script produced no output!</code> 是什么意思？</summary>
+            <div class="faq-body">通常是 Python 路径或依赖有问题。若依赖装在 conda / venv 里，额外传 <code>--python_path /path/to/python</code>；必要时补装 <code>cloudscraper</code> 和 <code>brotli</code>。</div>
+          </details>
+
+          <details data-reveal>
+            <summary><code>spawn npx ENOENT</code> 是什么意思？</summary>
+            <div class="faq-body">这通常不是项目逻辑问题，而是本机没有正确安装 Node.js / npm，或者命令没进 PATH。先确认 <code>npx</code> 在命令行里能直接执行，再回到客户端重新加载配置。</div>
+          </details>
+
+          <details data-reveal>
+            <summary>profile lock / SingletonLock 如何恢复？</summary>
+            <div class="faq-body">当前版本支持锁恢复：检测到锁冲突后会终止对应 profile 的 Chrome 进程并重试拉起。</div>
+          </details>
+
+          <details data-reveal>
+            <summary>auto-login 触发条件是什么？</summary>
+            <div class="faq-body">当 browser fallback 命中 login / not_logged_in 且环境变量配置了账号密码，会自动登录并重试一次请求。</div>
+          </details>
+
+          <details data-reveal>
+            <summary>MCPHub 报 MCP error -32000 怎么排查？</summary>
+            <div class="faq-body">这是通用错误码。需要查看 MCPHub 完整日志定位，常见原因是命令参数、环境变量、网络配置或权限配置错误。</div>
+          </details>
+
+          <details data-reveal>
+            <summary>Poke / 公网 endpoint 应该填什么格式？</summary>
+            <div class="faq-body">如果你走 MCPHub，对外地址通常是 <code>你的域名或 IP/mcp/nitan</code>。使用 Tailscale Funnel 时，可尝试 <code>https://xxx.ts.net/login/mcp/nitan</code>。</div>
+          </details>
+        </div>
+      </section>
+
+      <footer>
+        <div class="footer-grid">
+          <div class="footer-copy">
+            <strong>Nitan MCP</strong>
+            <span>Release-ready USCardForum automation toolkit.</span>
+          </div>
+
+          <div class="footer-links">
+            <a href="#install">OpenClaw Skill</a>
+            <a href="#quickstart">Quickstart</a>
+            <a href="https://github.com/nitansde/nitan-mcp" target="_blank" rel="noreferrer">GitHub</a>
+            <a href="https://www.npmjs.com/package/@nitansde/mcp" target="_blank" rel="noreferrer">NPM</a>
+            <a href="https://www.uscardforum.com/t/topic/450599" target="_blank" rel="noreferrer">论坛贴</a>
+          </div>
+        </div>
+      </footer>
+    </main>
+
+    <div id="toast" aria-live="polite"></div>
+
+    <script>
+      (() => {
+        const toast = document.getElementById("toast");
+        const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        let toastTimer = 0;
+
+        const showToast = (text) => {
+          if (!toast) return;
+          toast.textContent = text;
+          toast.style.opacity = "1";
+          window.clearTimeout(toastTimer);
+          toastTimer = window.setTimeout(() => {
+            toast.style.opacity = "0";
+          }, 1300);
+        };
+
+        async function copyText(text) {
+          try {
+            await navigator.clipboard.writeText(text);
+            return true;
+          } catch {
+            try {
+              const area = document.createElement("textarea");
+              area.value = text;
+              area.setAttribute("readonly", "true");
+              area.style.position = "fixed";
+              area.style.left = "-9999px";
+              document.body.appendChild(area);
+              area.select();
+              const ok = document.execCommand("copy");
+              document.body.removeChild(area);
+              return ok;
+            } catch {
+              return false;
+            }
+          }
+        }
+
+        document.addEventListener("click", async (event) => {
+          const button = event.target?.closest?.("[data-copy-target],[data-copy-text]");
+          if (!button) return;
+
+          let text = "";
+          const directText = button.getAttribute("data-copy-text");
+          if (directText) {
+            text = directText;
+          } else {
+            const targetSelector = button.getAttribute("data-copy-target");
+            if (!targetSelector) return;
+            const target = document.querySelector(targetSelector);
+            if (!target) return;
+            text = (target.textContent || "").replace(/\n\s+/g, "\n").trim();
+          }
+
+          const ok = await copyText(text);
+          showToast(ok ? "Copied" : "Copy failed");
+        });
+
+        const tabs = Array.from(document.querySelectorAll(".tab-btn[data-tab]"));
+        const panels = Array.from(document.querySelectorAll(".panel[data-panel]"));
+
+        function activateTab(tabId) {
+          tabs.forEach((tab) => {
+            const isActive = tab.dataset.tab === tabId;
+            tab.setAttribute("aria-selected", isActive ? "true" : "false");
+            tab.tabIndex = isActive ? 0 : -1;
+          });
+
+          panels.forEach((panel) => {
+            const isActive = panel.dataset.panel === tabId;
+            panel.classList.toggle("active", isActive);
+            panel.hidden = !isActive;
+          });
+        }
+
+        tabs.forEach((tab) => {
+          tab.addEventListener("click", () => activateTab(tab.dataset.tab));
+          tab.addEventListener("keydown", (event) => {
+            const key = event.key;
+            if (key !== "ArrowLeft" && key !== "ArrowRight" && key !== "Home" && key !== "End") return;
+
+            event.preventDefault();
+            const index = tabs.indexOf(tab);
+            const nextIndex =
+              key === "Home"
+                ? 0
+                : key === "End"
+                  ? tabs.length - 1
+                  : key === "ArrowLeft"
+                    ? (index - 1 + tabs.length) % tabs.length
+                    : (index + 1) % tabs.length;
+
+            const nextTab = tabs[nextIndex];
+            nextTab.focus();
+            activateTab(nextTab.dataset.tab);
+          });
+        });
+
+        activateTab("mac");
+
+        const revealItems = Array.from(document.querySelectorAll("[data-reveal]"));
+        if (!reduceMotion && "IntersectionObserver" in window) {
+          const observer = new IntersectionObserver(
+            (entries) => {
+              entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                entry.target.classList.add("is-visible");
+                observer.unobserve(entry.target);
+              });
+            },
+            { threshold: 0.16, rootMargin: "0px 0px -40px 0px" },
+          );
+
+          revealItems.forEach((item) => {
+            observer.observe(item);
+          });
+        } else {
+          revealItems.forEach((item) => {
+            item.classList.add("is-visible");
+          });
+        }
+
+        document.querySelectorAll(".spot-card").forEach((card) => {
+          card.addEventListener("pointermove", (event) => {
+            const rect = card.getBoundingClientRect();
+            const x = ((event.clientX - rect.left) / rect.width) * 100;
+            const y = ((event.clientY - rect.top) / rect.height) * 100;
+            card.style.setProperty("--spot-x", `${x}%`);
+            card.style.setProperty("--spot-y", `${y}%`);
+          });
+
+          card.addEventListener("pointerleave", () => {
+            card.style.setProperty("--spot-x", "50%");
+            card.style.setProperty("--spot-y", "50%");
+          });
+        });
+      })();
+    </script>
+  </body>
 </html>
