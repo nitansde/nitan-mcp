@@ -6,12 +6,12 @@
     <link rel="icon" type="image/png" href="logo.png" />
     <meta
       name="description"
-      content="Nitan MCP 项目主页：USCardForum 专用 MCP 工具集。聚焦搜索、读帖、通知、热帖追踪、稳定登录与 Cloudflare fallback。"
+      content="Nitan MCP 项目主页：USCardForum 美卡论坛 专用 AI 工具集。聚焦搜索、读帖、通知、热帖追踪、稳定登录与 Cloudflare fallback。"
     />
     <meta property="og:title" content="Nitan MCP" />
     <meta
       property="og:description"
-      content="USCardForum 专用 MCP 工具集：搜索、读帖、通知、热榜、稳定登录、Cloudflare fallback 与 OpenClaw Skill。"
+      content="USCardForum 美卡论坛 专用 AI 工具集：搜索、读帖、通知、热榜、稳定登录、Cloudflare fallback 与 OpenClaw Skill。"
     />
     <meta property="og:type" content="website" />
     <title>Nitan MCP · Project Home</title>
@@ -971,7 +971,7 @@
 
       .tabs {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 8px;
         padding: 8px;
         border-radius: 18px;
@@ -1322,34 +1322,33 @@
           <div class="eyebrow">Project Homepage</div>
           <h1>
             Nitan MCP,<br />
-            <span class="hero-accent">forum automation that stays up.</span>
+            <span class="hero-accent">US Card Forum automation.</span>
           </h1>
           <p class="lead">
-            面向 USCardForum 的发布级 MCP 工具集。把搜索、读帖、通知、热榜、话题筛选、登录态访问与
-            Cloudflare fallback，整理成一套适合真实自动化流程的稳定接口。
+            面向 美卡论坛 的Agent专用工具集。把搜索、读帖、通知、热榜、话题筛选整理成一套适合真实自动化流程的稳定接口，支持账户登录。
           </p>
           <p class="hero-meta">
-            覆盖 OpenClaw、Claude Desktop、MCPHub、Poke、云服务器与 Tailscale Funnel 等常见接入方式。
+            覆盖 OpenClaw、Claude Desktop、Poke常见AI Agent接入方式。
           </p>
 
           <div class="cta-row">
             <a class="btn btn-metal" href="#install">OpenClaw Skill</a>
             <a class="btn btn-glass" href="#quickstart">Quickstart</a>
-            <a class="btn btn-glass" href="https://github.com/nitansde/nitan-mcp" target="_blank" rel="noreferrer">Star on GitHub</a>
+            <a class="btn btn-glass" href="https://github.com/nitansde/nitan-mcp" target="_blank" rel="noreferrer">⭐ Star on GitHub</a>
           </div>
 
           <div class="metrics" aria-label="Highlights">
             <div class="metric">
-              <span class="metric-value">Node &gt;= 18</span>
-              <span class="metric-label">runtime floor</span>
+              <span class="metric-value">Self-Host</span>
+              <span>本地部署，保证数据安全</span>
             </div>
             <div class="metric">
               <span class="metric-value">Login recommended</span>
-              <span class="metric-label">private boards · notifications</span>
+              <span>登陆后可以查看个人通知，部分板块</span>
             </div>
             <div class="metric">
-              <span class="metric-value">Poke / Claude / OpenClaw</span>
-              <span class="metric-label">popular clients in the thread</span>
+              <span class="metric-value">OpenClaw / Claude / Poke</span>
+              <span>支持大部分Agent平台</span>
             </div>
           </div>
 
@@ -1359,30 +1358,29 @@
         <aside class="shell install-panel" id="install" data-reveal>
           <div class="signal-board" aria-hidden="true">
             <div class="signal-core"></div>
-            <span class="float-chip a">search</span>
-            <span class="float-chip b">notify</span>
-            <span class="float-chip c">fallback</span>
-            <span class="float-chip d">doctor</span>
+            <span class="float-chip a">Search</span>
+            <span class="float-chip b">Read Topic</span>
+            <span class="float-chip c">Notification</span>
+            <span class="float-chip d">Popular Topics</span>
           </div>
 
           <div class="install-copy">
             <div class="section-kicker">OpenClaw</div>
-            <h2>Skill 安装入口</h2>
+            <h2>OpenClaw Skill 快速安装</h2>
             <p>
-              OpenClaw 可直接导入 skill 使用。想先确认环境是否正常，先跑 <code>npx</code> + <code>doctor</code> 即可。
+              Skill已上架ClawHub，可直接安装。
             </p>
           </div>
 
           <div class="codewrap">
             <div class="codebar">
-              <span>Pack Skill</span>
+              <span>Install Skill</span>
               <button class="copybtn" type="button" data-copy-target="#skill-pack">Copy</button>
             </div>
-            <pre><code id="skill-pack">pnpm skill:pack
-# output: dist-skill/nitan.skill</code></pre>
+            <pre><code id="skill-pack">clawhub install nitan</code></pre>
           </div>
 
-          <div class="install-points">
+          <!-- <div class="install-points">
             <div class="mini-card">
               <strong>Pack once</strong>
               <span>生成 <code>dist-skill/nitan.skill</code></span>
@@ -1399,6 +1397,11 @@
               <strong>Verify</strong>
               <span>用 <code>doctor</code> 做一次自检</span>
             </div>
+          </div> -->
+          <div class="install-copy">
+            <p>
+              Skill安装完后，部署本地运行环境。
+            </p>
           </div>
 
           <div class="codewrap">
@@ -1410,7 +1413,8 @@
 npx -y @nitansde/mcp@latest doctor</code></pre>
           </div>
 
-          <p class="hint">导入 <code>dist-skill/nitan.skill</code> 后即可在 OpenClaw 里直接调用。</p>
+          <p class="hint">通知OpenClaw: "我已经安装nitan skill，帮我查看一下论坛今日热帖"</p>
+          <p class="hint">如需登录，可以私聊OpenClaw你的账户密码或者自己修改openclaw.json配置文件</p>
         </aside>
       </section>
 
@@ -1418,7 +1422,7 @@ npx -y @nitansde/mcp@latest doctor</code></pre>
         <div class="section-head">
           <div>
             <div class="section-kicker">Capabilities</div>
-            <h2>把论坛操作变成稳定工具调用</h2>
+            <h2>让Agent也能稳定逛论坛</h2>
           </div>
           <p>基于官方 Discourse MCP 扩展，补上更适合泥潭使用的登录、通知和论坛工具。</p>
         </div>
@@ -1450,7 +1454,7 @@ npx -y @nitansde/mcp@latest doctor</code></pre>
               <span class="tag">Reliability</span>
             </div>
             <h3>Cloudflare 双策略</h3>
-            <p class="card-text">优先 cloudscraper，失败自动切换 curl_cffi；macOS 还能继续走浏览器 fallback。</p>
+            <p class="card-text">支持双模式Cloudflare绕过；macOS 还能继续走浏览器 fallback。</p>
             <div class="card-tagline">cloudscraper · curl_cffi · playwright</div>
           </article>
 
@@ -1470,7 +1474,7 @@ npx -y @nitansde/mcp@latest doctor</code></pre>
               <span class="tag">Users</span>
             </div>
             <h3>用户动态追踪</h3>
-            <p class="card-text">查看某个用户最近回帖，配合 Poke 或定时任务，可以实现“这个人一发言就提醒我”。</p>
+            <p class="card-text">查看某个用户最近回帖，配合或定时任务，可以实现“这个人一发言就提醒我”。</p>
             <div class="card-tagline">user activity · alerts</div>
           </article>
 
@@ -1479,17 +1483,17 @@ npx -y @nitansde/mcp@latest doctor</code></pre>
               <span class="step-no">06</span>
               <span class="tag">Categories</span>
             </div>
-            <h3>板块巡检与新工具</h3>
-            <p class="card-text">支持查看某个板块最新帖子；v1.2.0 还补了精彩话题和难绷话题两个新入口。</p>
-            <div class="card-tagline">latest posts · excellent · cringe</div>
+            <h3>板块监控</h3>
+            <p class="card-text">支持查看某个板块最新帖子；还补了精彩话题和难绷话题两个新入口。</p>
+            <div class="card-tagline">latest topics · excellent topic · funny topic</div>
           </article>
         </div>
 
-        <div class="process-grid" aria-label="Deployment flow">
+        <!-- <div class="process-grid" aria-label="Deployment flow">
           <article class="process-card spot-card" data-reveal>
             <span class="step-no">01 / OpenClaw</span>
             <h3>Let the agent do it</h3>
-            <p>OpenClaw 可以直接接入，适合先跑通再细调。</p>
+            <p>OpenClaw 可以直接接入。MCP / Skills双模式</p>
           </article>
           <article class="process-card spot-card" data-reveal>
             <span class="step-no">02 / Desktop</span>
@@ -1511,7 +1515,7 @@ npx -y @nitansde/mcp@latest doctor</code></pre>
             <h3>Expose safely</h3>
             <p>公网接入时建议反向代理或 Tailscale Funnel；对外地址通常是 <code>/mcp/nitan</code>。</p>
           </article>
-        </div>
+        </div> -->
       </section>
 
       <section class="shell section" id="quickstart" data-reveal>
@@ -1520,42 +1524,61 @@ npx -y @nitansde/mcp@latest doctor</code></pre>
             <div class="section-kicker">Quickstart</div>
             <h2>按环境快速接入</h2>
           </div>
-          <p>本地、MCPHub 和云端三条常见路径都能直接复制使用。</p>
+          <p>根据自己的平台查看对应安装方式。</p>
         </div>
 
         <div class="tabs" role="tablist" aria-label="Quickstart Tabs">
-          <button class="tab-btn" id="tab-mac" type="button" role="tab" aria-selected="true" aria-controls="panel-mac" tabindex="0" data-tab="mac">macOS</button>
-          <button class="tab-btn" id="tab-win" type="button" role="tab" aria-selected="false" aria-controls="panel-win" tabindex="-1" data-tab="win">Windows</button>
-          <button class="tab-btn" id="tab-linux" type="button" role="tab" aria-selected="false" aria-controls="panel-linux" tabindex="-1" data-tab="linux">NAS / Linux</button>
-          <button class="tab-btn" id="tab-cloud" type="button" role="tab" aria-selected="false" aria-controls="panel-cloud" tabindex="-1" data-tab="cloud">Cloud</button>
+          <button class="tab-btn" id="tab-local" type="button" role="tab" aria-selected="true" aria-controls="panel-local" tabindex="0" data-tab="local">macOS / Linux (Local)</button>
+          <button class="tab-btn" id="tab-claude" type="button" role="tab" aria-selected="false" aria-controls="panel-claude" tabindex="-1" data-tab="claude">Claude Desktop</button>
+          <button class="tab-btn" id="tab-remote" type="button" role="tab" aria-selected="false" aria-controls="panel-remote" tabindex="-1" data-tab="remote">Linux Server / NAS / GCP</button>
         </div>
 
         <div class="panel-stack">
-          <article class="panel active" id="panel-mac" role="tabpanel" aria-labelledby="tab-mac" data-panel="mac" tabindex="0">
+          <article class="panel active" id="panel-local" role="tabpanel" aria-labelledby="tab-local" data-panel="local" tabindex="0">
             <div class="panel-grid">
               <div>
                 <ol class="panel-list">
-                  <li>先装 Claude Desktop，在 Developer 里打开配置文件。</li>
-                  <li>把下面这段 <code>nitan</code> 配置写进去；要登录就把用户名密码一起填上。</li>
-                  <li>重启 Claude Desktop，connector 里能看到 nitan 就算接好了。</li>
+                  <li>macOS 或 Linux 本地安装 Node.js 18+。</li>
+                  <li>直接运行 <code>npx -y @nitansde/mcp@latest</code> 启动服务。</li>
+                  <li>建议再运行一次 <code>doctor</code> 做环境检查。</li>
                 </ol>
-                <p class="panel-note">本地部署通常几分钟就能跑通；macOS 体验最完整。</p>
+                <p class="panel-note"><strong>Optional: 让Agent使用需要安装nitan Skill</strong></p>
+                <p class="panel-note"><strong>Optional login:</strong> 启动前设置 <code>NITAN_USERNAME</code> 与 <code>NITAN_PASSWORD</code>。不设置时可以公共只读访问。</p>
               </div>
 
               <div class="codewrap">
                 <div class="codebar">
-                  <span>Claude Desktop Config</span>
-                  <button class="copybtn" type="button" data-copy-target="#qs-mac">Copy</button>
+                  <span>Local Run</span>
+                  <button class="copybtn" type="button" data-copy-target="#qs-local">Copy</button>
                 </div>
-                <pre><code id="qs-mac">{
+                <pre><code id="qs-local">npx -y @nitansde/mcp@latest
+npx -y @nitansde/mcp@latest doctor</code></pre>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel" id="panel-claude" role="tabpanel" aria-labelledby="tab-claude" data-panel="claude" tabindex="0" hidden>
+            <div class="panel-grid">
+              <div>
+                <ol class="panel-list">
+                  <li>打开 Claude Desktop 配置文件。</li>
+                  <li>把下面的 <code>mcpServers.nitan</code> 配置写入并保存。</li>
+                  <li>重启 Claude Desktop，确认 connector 里出现 <code>nitan</code>。</li>
+                </ol>
+                <p class="panel-note">配置文件路径：macOS 为 <code>~/Library/Application Support/Claude/claude_desktop_config.json</code>，Windows 为 <code>%APPDATA%\Claude\claude_desktop_config.json</code>。</p>
+                <p class="panel-note"><strong>Optional login:</strong> 在配置里添加 <code>env</code> 字段并填入 <code>NITAN_USERNAME</code> / <code>NITAN_PASSWORD</code>。</p>
+              </div>
+
+              <div class="codewrap">
+                <div class="codebar">
+                  <span>Claude Config</span>
+                  <button class="copybtn" type="button" data-copy-target="#qs-claude">Copy</button>
+                </div>
+                <pre><code id="qs-claude">{
   "mcpServers": {
     "nitan": {
       "command": "npx",
-      "args": ["-y", "@nitansde/mcp@latest"],
-      "env": {
-        "NITAN_USERNAME": "YOUR_USERNAME",
-        "NITAN_PASSWORD": "YOUR_PASSWORD"
-      }
+      "args": ["-y", "@nitansde/mcp@latest"]
     }
   }
 }</code></pre>
@@ -1563,47 +1586,29 @@ npx -y @nitansde/mcp@latest doctor</code></pre>
             </div>
           </article>
 
-          <article class="panel" id="panel-win" role="tabpanel" aria-labelledby="tab-win" data-panel="win" tabindex="0" hidden>
+          <article class="panel" id="panel-remote" role="tabpanel" aria-labelledby="tab-remote" data-panel="remote" tabindex="0" hidden>
             <div class="panel-grid">
               <div>
                 <ol class="panel-list">
-                  <li>Windows 本地部署同样走 Claude Desktop + <code>npx</code> 配置。</li>
-                  <li>如果 Python 在 venv / conda 里，优先把依赖装好，必要时再额外传 <code>--python_path</code>。</li>
-                  <li>遇到报错先看完整日志，不要只截最后一行通用错误码。</li>
+                  <li>先部署 MCPHub（Docker 镜像：<a href="https://hub.docker.com/r/samanhappy/mcphub" target="_blank" rel="noreferrer">samanhappy/mcphub</a>）。</li>
+                  <li>进入 MCPHub 仪表盘，新建一个 STDIO server。</li>
+                  <li>Command 填 <code>npx</code>，Arguments 填 <code>-y @nitansde/mcp@latest</code>，保存后会自动安装并启动。</li>
+                  <li>对外访问通常使用 <code>/mcp/nitan</code> endpoint。</li>
                 </ol>
-                <p class="panel-note">Windows 重点检查 Python 路径和依赖，尤其是 <code>curl_cffi</code> 相关报错。</p>
+                <p class="panel-note">这套方式适用于 Linux Server、NAS 和 GCP 等远程主机。建议修改 MCPHub 默认管理员凭据并开启 Bearer Authentication。</p>
+                <p class="panel-note"><strong>Optional login:</strong> 在 MCPHub 的 Environment Variables 里添加 <code>NITAN_USERNAME</code> / <code>NITAN_PASSWORD</code>（可选再加 <code>TIMEZONE</code>）。</p>
               </div>
 
               <div class="codewrap">
                 <div class="codebar">
-                  <span>PowerShell</span>
-                  <button class="copybtn" type="button" data-copy-target="#qs-win">Copy</button>
+                  <span>MCPHub Setup</span>
+                  <button class="copybtn" type="button" data-copy-target="#qs-remote">Copy</button>
                 </div>
-                <pre><code id="qs-win">py -3 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-npx -y @nitansde/mcp@latest --python_path C:\path\to\python.exe</code></pre>
-              </div>
-            </div>
-          </article>
+                <pre><code id="qs-remote"># Start MCPHub
+docker run -p 3000:3000 samanhappy/mcphub
 
-          <article class="panel" id="panel-linux" role="tabpanel" aria-labelledby="tab-linux" data-panel="linux" tabindex="0" hidden>
-            <div class="panel-grid">
-              <div>
-                <ol class="panel-list">
-                  <li>NAS / Linux 通常先用 Docker 跑 MCPHub。</li>
-                  <li>在 MCPHub 里新增一个 STDIO server，command 填 <code>npx</code>，args 填包名。</li>
-                  <li>保存后 MCPHub 会自动安装并启动，出错就去左侧 logs 看完整日志。</li>
-                </ol>
-                <p class="panel-note">建议开启 Bearer Token，并补上 <code>TIMEZONE</code>；对外地址通常是 <code>.../mcp/nitan</code>。</p>
-              </div>
-
-              <div class="codewrap">
-                <div class="codebar">
-                  <span>MCPHub Fields</span>
-                  <button class="copybtn" type="button" data-copy-target="#qs-linux">Copy</button>
-                </div>
-                <pre><code id="qs-linux">Server Name: nitan
+# Add Nitan MCP in MCPHub
+Server Name: nitan
 Server Type: STDIO
 Command: npx
 Arguments: -y @nitansde/mcp@latest
@@ -1615,28 +1620,6 @@ TIMEZONE=America/Los_Angeles</code></pre>
               </div>
             </div>
           </article>
-
-          <article class="panel" id="panel-cloud" role="tabpanel" aria-labelledby="tab-cloud" data-panel="cloud" tabindex="0" hidden>
-            <div class="panel-grid">
-              <div>
-                <ol class="panel-list">
-                  <li>GCP free tier + Gemini CLI + MCPHub 也能跑，性能要求不高。</li>
-                  <li>先放行端口（示例里是 13000），再让 Gemini CLI 帮你装 Docker 和 MCPHub。</li>
-                  <li>部署好后一定要改掉默认 admin / admin123，并开启 Bearer Authentication。</li>
-                </ol>
-                <p class="panel-note">1GB 内存的小机器建议把 swap 提高到 4GB。</p>
-              </div>
-
-              <div class="codewrap">
-                <div class="codebar">
-                  <span>Gemini CLI Prompt</span>
-                  <button class="copybtn" type="button" data-copy-target="#qs-cloud">Copy</button>
-                </div>
-                <pre><code id="qs-cloud">install and run docker image samanhappy/mcphub \
-with port 13000:3000 on VM &lt;your-vm-name&gt;</code></pre>
-              </div>
-            </div>
-          </article>
         </div>
       </section>
 
@@ -1644,19 +1627,28 @@ with port 13000:3000 on VM &lt;your-vm-name&gt;</code></pre>
         <div class="section-head">
           <div>
             <div class="section-kicker">Assistants</div>
-            <h2>论坛里最常见的接入组合</h2>
+            <h2>兼容的Agent客户端</h2>
           </div>
-          <p>常见组合主要是 Poke、Claude Desktop、OpenClaw，以及少量 Perplexity / Antigravity 用法。</p>
+          <p>兼容大部分Agent和LLM客户端。</p>
         </div>
 
         <div class="stats-grid" role="list">
+            <article class="stat-card spot-card" role="listitem" data-reveal>
+            <div class="card-head">
+              <span class="step-no">OpenClaw+</span>
+              <span class="tag">others</span>
+            </div>
+            <h3>OpenClaw</h3>
+            <p>OpenClaw 可通过安装Skill使用。</p>
+          </article>
+
           <article class="stat-card spot-card" role="listitem" data-reveal>
             <div class="card-head">
               <span class="step-no">Poke</span>
               <span class="tag">alerts</span>
             </div>
-            <h3>短信提醒流</h3>
-            <p>Poke 很适合做每日简报、消息提醒和用户回帖追踪。</p>
+            <h3>Poke.com</h3>
+            <p>Poke 很适合做每日简报、消息提醒和用户回帖追踪。需要部署在remote，结合MCPHub使用</p>
           </article>
 
           <article class="stat-card spot-card" role="listitem" data-reveal>
@@ -1664,18 +1656,10 @@ with port 13000:3000 on VM &lt;your-vm-name&gt;</code></pre>
               <span class="step-no">Claude</span>
               <span class="tag">desktop</span>
             </div>
-            <h3>最容易本地跑通</h3>
-            <p>Claude Desktop 最容易本地跑通，免费 plan 也能接 MCP。</p>
+            <h3>Claude Desktop</h3>
+            <p>最容易本地跑通，免费 plan 也能接 MCP。</p>
           </article>
 
-          <article class="stat-card spot-card" role="listitem" data-reveal>
-            <div class="card-head">
-              <span class="step-no">OpenClaw+</span>
-              <span class="tag">others</span>
-            </div>
-            <h3>OpenClaw、Perplexity、Antigravity</h3>
-            <p>OpenClaw 可直接使用；Perplexity Pro 也有人跑通，但请求过快时可能触发封 IP。</p>
-          </article>
         </div>
       </section>
 
@@ -1701,7 +1685,7 @@ with port 13000:3000 on VM &lt;your-vm-name&gt;</code></pre>
                 <span class="mini-label">Prompt</span>
                 <button class="copybtn" type="button" data-copy-text="每天早上 8 点生成昨日热帖简报，格式为标题 + 3 行摘要 + 链接。">Copy</button>
               </div>
-              <p class="prompt-text">每天早上 8 点生成昨日热帖简报，格式为标题 + 3 行摘要 + 链接。</p>
+              <p class="prompt-text">每天早上 9 点生成今日热帖简报，并附上链接。</p>
             </div>
           </article>
 
@@ -1717,7 +1701,7 @@ with port 13000:3000 on VM &lt;your-vm-name&gt;</code></pre>
                 <span class="mini-label">Prompt</span>
                 <button class="copybtn" type="button" data-copy-text="检查未读通知并做一句话摘要，高优先级通知单独标记。">Copy</button>
               </div>
-              <p class="prompt-text">检查未读通知并做一句话摘要，高优先级通知单独标记。</p>
+              <p class="prompt-text">每小时检查一次我的未读通知。</p>
             </div>
           </article>
 
@@ -1733,7 +1717,7 @@ with port 13000:3000 on VM &lt;your-vm-name&gt;</code></pre>
                 <span class="mini-label">Prompt</span>
                 <button class="copybtn" type="button" data-copy-text="每 2 小时搜索 amex retention，有新帖时发送链接与要点。">Copy</button>
               </div>
-              <p class="prompt-text">每 2 小时搜索 amex retention，有新帖时发送链接与要点。</p>
+              <p class="prompt-text">每 2 小时搜索 Mac Mini折扣，有新帖时发送链接与要点。</p>
             </div>
           </article>
 
@@ -1797,7 +1781,7 @@ with port 13000:3000 on VM &lt;your-vm-name&gt;</code></pre>
                 <span class="mini-label">Prompt</span>
                 <button class="copybtn" type="button" data-copy-text="现在你可以用 nitan mcp 获取到最新的精彩话题和难绷的话题了。每天检查一次，当天如果有新的精彩的话题或者难绷的话题，帮我总结好内容并通知我，需要附上链接。">Copy</button>
               </div>
-              <p class="prompt-text">现在你可以用 nitan mcp 获取到最新的精彩话题和难绷的话题了。每天检查一次，当天如果有新的精彩的话题或者难绷的话题，帮我总结好内容并通知我，需要附上链接。</p>
+              <p class="prompt-text">每天检查一次，当天如果有新的精彩的话题或者难绷的话题，帮我总结好内容并通知我，需要附上链接。</p>
             </div>
           </article>
 
@@ -1831,7 +1815,7 @@ with port 13000:3000 on VM &lt;your-vm-name&gt;</code></pre>
         <div class="faq-list">
           <details data-reveal>
             <summary>为什么官方 Discourse MCP 不够，需要单独做 Nitan MCP？</summary>
-            <div class="faq-body">官方版本偏通用。Nitan MCP 在它的基础上补了登录、通知和更多论坛专用工具。</div>
+            <div class="faq-body">官方版本偏通用，对美卡论坛兼容较差。Nitan MCP 在它的基础上补了登录、通知和更多论坛专用工具。</div>
           </details>
 
           <details data-reveal>
@@ -1841,17 +1825,17 @@ with port 13000:3000 on VM &lt;your-vm-name&gt;</code></pre>
 
           <details data-reveal>
             <summary>为什么会出现 403 / Cloudflare challenge？</summary>
-            <div class="faq-body">先确认 Python 依赖与网络环境。系统会先走 cloudscraper，再自动回退 curl_cffi；在 macOS 还可进入浏览器 fallback。</div>
+            <div class="faq-body">Cloudflare会对bot流量进行阻拦。如果失败，会提示这个。在 macOS 支持了浏览器 fallback，无法访问论坛时会弹出浏览器来抓取页面。</div>
           </details>
 
           <details data-reveal>
             <summary>云服务器是不是更容易被 Cloudflare / CSRF 卡住？</summary>
-            <div class="faq-body">是。云 IP 更容易遇到 403 / CSRF；本地电脑、NAS 或家宽网络通常更稳。</div>
+            <div class="faq-body">是。云 IP 更容易遇到 403 / CSRF，尤其是Google Cloud；本地电脑、NAS 或家宽网络通常更稳。</div>
           </details>
 
           <details data-reveal>
             <summary>not_logged_in 导致通知不可用，如何处理？</summary>
-            <div class="faq-body">通知属于登录态能力。配置 <code>NITAN_USERNAME</code> 与 <code>NITAN_PASSWORD</code>，或通过 interactive login 完成登录。</div>
+            <div class="faq-body">通知属于登录态能力。配置 <code>NITAN_USERNAME</code> 与 <code>NITAN_PASSWORD</code>，或通过 interactive login 完成登录。如果使用Skill，可以询问Agent如何配置。</div>
           </details>
 
           <details data-reveal>
@@ -2009,7 +1993,7 @@ with port 13000:3000 on VM &lt;your-vm-name&gt;</code></pre>
           });
         });
 
-        activateTab("mac");
+        activateTab("local");
 
         const revealItems = Array.from(document.querySelectorAll("[data-reveal]"));
         if (!reduceMotion && "IntersectionObserver" in window) {
