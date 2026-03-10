@@ -1,5 +1,7 @@
 ## Nitan MCP
 
+> **Project Homepage:** [https://nitan.ai/mcp](https://nitan.ai/mcp)
+
 [论坛开发讨论贴](https://www.uscardforum.com/t/topic/450599)
 
 This is a heavy modified version of [Discourse MCP](https://github.com/discourse/discourse-mcp). It will be a dedicated MCP client for https://www.uscardforum.com/
