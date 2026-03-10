@@ -66,44 +66,60 @@ except json.JSONDecodeError as e:
     print(f"Invalid json_args: {e}", file=sys.stderr)
     sys.exit(2)
 
-proc = subprocess.Popen(
-    ["npx", "-y", "@nitansde/mcp@latest"],
-    stdin=subprocess.PIPE,
-    stdout=subprocess.PIPE,
-    stderr=sys.stderr,
-)
+server_cmd = ["npx", "--no-install", "nitan-mcp"]
 
 try:
-    send_msg(proc, {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-            "protocolVersion": "2024-11-05",
-            "capabilities": {},
-            "clientInfo": {"name": "nitan-skill-shell", "version": "1.0.0"}
-        }
-    })
-    init_res = wait_for_response(proc, 1)
-    if "error" in init_res:
-        print(json.dumps(init_res["error"], ensure_ascii=False, indent=2), file=sys.stderr)
-        sys.exit(3)
+    proc = subprocess.Popen(
+        server_cmd,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=sys.stderr,
+    )
+except FileNotFoundError:
+    print("Failed to find npx in PATH.", file=sys.stderr)
+    print("Install Node.js and npm first, then install nitan-mcp globally:", file=sys.stderr)
+    print("  npm install -g @nitansde/mcp@latest", file=sys.stderr)
+    sys.exit(5)
 
-    send_msg(proc, {"jsonrpc": "2.0", "method": "notifications/initialized"})
+try:
+    try:
+        send_msg(proc, {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "nitan-skill-shell", "version": "1.0.0"}
+            }
+        })
+        init_res = wait_for_response(proc, 1)
+        if "error" in init_res:
+            print(json.dumps(init_res["error"], ensure_ascii=False, indent=2), file=sys.stderr)
+            sys.exit(3)
 
-    send_msg(proc, {
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "tools/call",
-        "params": {"name": tool_name, "arguments": tool_args}
-    })
-    call_res = wait_for_response(proc, 2)
+        send_msg(proc, {"jsonrpc": "2.0", "method": "notifications/initialized"})
 
-    if "error" in call_res:
-        print(json.dumps(call_res["error"], ensure_ascii=False, indent=2), file=sys.stderr)
-        sys.exit(4)
+        send_msg(proc, {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {"name": tool_name, "arguments": tool_args}
+        })
+        call_res = wait_for_response(proc, 2)
 
-    print(json.dumps(call_res.get("result", {}), ensure_ascii=False, indent=2))
+        if "error" in call_res:
+            print(json.dumps(call_res["error"], ensure_ascii=False, indent=2), file=sys.stderr)
+            sys.exit(4)
+
+        print(json.dumps(call_res.get("result", {}), ensure_ascii=False, indent=2))
+    except (EOFError, RuntimeError, TimeoutError) as exc:
+        print(f"Failed to communicate with local MCP server: {exc}", file=sys.stderr)
+        if proc.poll() not in (None, 0):
+            print("Make sure nitan-mcp is installed globally and available to npx without install:", file=sys.stderr)
+            print("  npm install -g @nitansde/mcp@latest", file=sys.stderr)
+            print("Then retry this command.", file=sys.stderr)
+        sys.exit(6)
 finally:
     try:
         proc.terminate()

@@ -1,6 +1,6 @@
 ---
 name: nitan
-description: Use the local Nitan MCP stdio server (installed via npx) for uscardforum.com search, reading, monitoring, and optional posting workflows.
+description: Use the local Nitan MCP stdio server (installed once globally via npm, launched via npx) for uscardforum.com search, reading, monitoring, and optional posting workflows.
 ---
 
 # Nitan MCP skill
@@ -10,9 +10,10 @@ Use this skill as a thin bridge to the existing local MCP server. Do not reimple
 ## Runtime assumptions (stdio only)
 
 - Assume the user already has a local MCP client that launches this server via stdio.
+- Install once globally for frequent use: `npm install -g @nitansde/mcp@latest`.
 - The expected launch form is:
   - command: `npx`
-  - args: `[-y, @nitansde/mcp@latest]`
+  - args: `[--no-install, nitan-mcp]`
 - Communication model: MCP client <-> local server subprocess over stdin/stdout (JSON-RPC).
 - Do not require local repository files or paths such as `node dist/index.js`, `src/`, or `requirements.txt`.
 - Do not ask the user to clone this repo.
@@ -30,7 +31,7 @@ Use only the tools exposed by the running server. Do not assume hidden/disabled 
 
 ## Shell wrappers for supported tools
 
-This skill includes `scripts/*.sh` wrappers that match the tools exposed in the default nitan skill runtime (`npx -y @nitansde/mcp@latest`).
+This skill includes `scripts/*.sh` wrappers that match the tools exposed in the default nitan skill runtime (`npx --no-install nitan-mcp`).
 
 - Core runner: `scripts/mcp_call.sh <tool_name> [json_args]`
 - Per-tool wrappers:
@@ -54,7 +55,8 @@ skills/nitan/scripts/discourse_read_topic.sh '{"topic_id":12345,"post_limit":20}
 ```
 
 Notes:
-- Wrappers start a short-lived stdio MCP session (`npx -y @nitansde/mcp@latest`), initialize, call `tools/call`, then exit.
+- Wrappers start a short-lived stdio MCP session (`npx --no-install nitan-mcp`), initialize, call `tools/call`, then exit.
+- If `npx --no-install nitan-mcp` fails, install once globally: `npm install -g @nitansde/mcp@latest`.
 - `json_args` defaults to `{}` when omitted.
 
 ### Read and analysis tools (default)
