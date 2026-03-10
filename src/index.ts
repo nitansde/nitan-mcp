@@ -16,6 +16,7 @@ import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -153,8 +154,18 @@ async function loadProfile(path?: string): Promise<Partial<Profile>> {
 }
 
 function getDefaultPythonPath(): string {
-  const venvPython = process.platform === "win32" ? ".venv\\Scripts\\python.exe" : ".venv/bin/python";
-  if (existsSync(venvPython)) return venvPython;
+  const cwdVenvPython = process.platform === "win32" ? ".venv\\Scripts\\python.exe" : ".venv/bin/python";
+  if (existsSync(cwdVenvPython)) return cwdVenvPython;
+
+  const packageVenvPythonUrl =
+    process.platform === "win32"
+      ? new URL("../.venv/Scripts/python.exe", import.meta.url)
+      : new URL("../.venv/bin/python", import.meta.url);
+
+  if (existsSync(packageVenvPythonUrl)) {
+    return fileURLToPath(packageVenvPythonUrl);
+  }
+
   return process.platform === "win32" ? "python" : "python3";
 }
 
