@@ -11,9 +11,10 @@ ARGS_JSON='{}'
 if [[ $# -ge 2 ]]; then
   ARGS_JSON="$2"
 fi
-MCP_PACKAGE="${NITAN_MCP_PACKAGE:-@nitansde/mcp@latest}"
+MCP_PACKAGE="${NITAN_MCP_PACKAGE:-nitan-mcp}"
+MCP_ALLOW_INSTALL="${NITAN_MCP_ALLOW_INSTALL:-0}"
 
-python3 - "$TOOL_NAME" "$ARGS_JSON" "$MCP_PACKAGE" <<'PY'
+python3 - "$TOOL_NAME" "$ARGS_JSON" "$MCP_PACKAGE" "$MCP_ALLOW_INSTALL" <<'PY'
 import json
 import os
 import select
@@ -24,6 +25,7 @@ import time
 tool_name = sys.argv[1]
 args_text = sys.argv[2]
 mcp_package = sys.argv[3]
+allow_install = sys.argv[4] == "1"
 response_timeout = int(os.getenv("NITAN_MCP_RESPONSE_TIMEOUT", "120"))
 
 try:
@@ -72,8 +74,14 @@ def wait_for_id(proc, req_id, timeout_s):
             return msg
 
 
+cmd = ["npx"]
+if allow_install:
+    cmd += ["-y", mcp_package]
+else:
+    cmd += ["--no-install", mcp_package]
+
 proc = subprocess.Popen(
-    ["npx", "-y", mcp_package],
+    cmd,
     stdin=subprocess.PIPE,
     stdout=subprocess.PIPE,
     stderr=sys.stderr,
