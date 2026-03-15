@@ -595,16 +595,20 @@ async function main() {
     // can only handle a single request per instance (MCP SDK >=1.27.0 restriction).
     // With --http-allow-reuse: stateful session mode, allowing the transport to serve
     // multiple requests. Required for persistent HTTP server deployments.
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: config.http_allow_reuse ? () => randomUUID() : undefined,
-      enableJsonResponse: true,
-    });
+    const createTransport = async () => {
+      const t = new StreamableHTTPServerTransport({
+        sessionIdGenerator: config.http_allow_reuse ? () => randomUUID() : undefined,
+        enableJsonResponse: true,
+      });
+      await server.connect(t);
+      return t;
+    };
+
+    let activeTransport = await createTransport();
 
     if (config.http_allow_reuse) {
       logger.info("HTTP transport: stateful session mode enabled (--http-allow-reuse)");
     }
-
-    await server.connect(transport);
 
     const httpServer = createServer(async (req, res) => {
       // Health check endpoint
@@ -623,7 +627,18 @@ async function main() {
         req.on("end", async () => {
           try {
             const parsedBody = body ? JSON.parse(body) : undefined;
-            await transport.handleRequest(req, res, parsedBody);
+            // In stateful mode: if this is an initialize request with no session ID
+            // and the current transport is already initialized, reset the transport
+            // so clients can reconnect after server restart or session expiry.
+            if (config.http_allow_reuse && req.method === "POST" && !req.headers["mcp-session-id"] && parsedBody) {
+              const msg = Array.isArray(parsedBody) ? parsedBody[0] : parsedBody;
+              if (msg && msg.method === "initialize" && activeTransport.sessionId !== undefined) {
+                logger.info("HTTP transport: new initialize request detected, resetting session");
+                await activeTransport.close().catch(() => {});
+                activeTransport = await createTransport();
+              }
+            }
+            await activeTransport.handleRequest(req, res, parsedBody);
           } catch (error) {
             logger.error(`Request handling error: ${error}`);
             if (!res.headersSent) {
@@ -656,7 +671,7 @@ async function main() {
         await new Promise<void>((resolve) => {
           httpServer.close(() => resolve());
         });
-        await transport.close();
+        await activeTransport.close();
         logger.info("HTTP server closed");
         process.exit(0);
       })().catch((e) => {
