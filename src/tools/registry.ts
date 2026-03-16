@@ -19,6 +19,7 @@ import { registerListNotifications } from "./builtin/list_notifications.js";
 import { registerListTopTopics } from "./builtin/list_top_topics.js";
 import { registerListExcellentTopics } from "./builtin/list_excellent_topics.js";
 import { registerListFunnyTopics } from "./builtin/list_funny_topics.js";
+import { registerGetTrustLevelProgress } from "./builtin/get_trust_level_progress.js";
 
 export type ToolsMode = "auto" | "discourse_api_only" | "tool_exec_api";
 
@@ -60,4 +61,5 @@ export async function registerAllTools(
   registerCreateUser(server, ctx, { allowWrites: opts.allowWrites });
   registerCreateCategory(server, ctx, { allowWrites: opts.allowWrites });
   registerCreateTopic(server, ctx, { allowWrites: opts.allowWrites });
+  registerGetTrustLevelProgress(server, ctx, { allowWrites: false });
 }
