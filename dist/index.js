@@ -73,7 +73,7 @@ const ProfileSchema = z
         .default(50000)
         .describe("Maximum number of characters to include when returning post content (set via --max-read-length)"),
     transport: z.enum(["stdio", "http"]).optional().default("stdio").describe("Transport type: stdio (default) or http"),
-    port: z.number().int().positive().optional().default(3000).describe("Port to listen on when using HTTP transport"),
+    port: z.number().int().positive().optional().default(3001).describe("Port to listen on when using HTTP transport"),
     http_allow_reuse: z.boolean().optional().default(false).describe("Allow HTTP transport reuse across requests (uses stateful session mode). Required when deploying as a persistent HTTP server with MCP SDK >=1.27.0."),
     use_cloudscraper: z.boolean().optional().describe("(Deprecated: use bypass_method instead) Use Python cloudscraper to bypass Cloudflare"),
     bypass_method: z.enum(["cloudscraper", "curl_cffi", "both"]).optional().default("both").describe("Cloudflare bypass method: 'cloudscraper', 'curl_cffi', or 'both' (default - tries cloudscraper with curl_cffi fallback)"),
@@ -205,7 +205,7 @@ function mergeConfig(profile, flags) {
         default_search: ((flags.default_search ?? flags["default-search"]) ?? profile.default_search),
         max_read_length: ((flags.max_read_length ?? flags["max-read-length"]) ?? profile.max_read_length ?? 50000),
         transport: (flags.transport ?? profile.transport ?? "stdio"),
-        port: (flags.port ?? profile.port ?? 3000),
+        port: (flags.port ?? profile.port ?? 3001),
         http_allow_reuse: ((flags.http_allow_reuse ?? flags["http-allow-reuse"]) ?? profile.http_allow_reuse ?? false),
         use_cloudscraper: ((flags.use_cloudscraper ?? flags["use-cloudscraper"]) ?? profile.use_cloudscraper),
         bypass_method: ((flags.bypass_method ?? flags["bypass-method"]) ?? profile.bypass_method ?? "both"),

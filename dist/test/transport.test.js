@@ -74,7 +74,7 @@ test('stdio transport is the default', async () => {
     });
     await new Promise(resolve => setTimeout(resolve, 1000));
     try {
-        await fetch('http://localhost:3000/health', { signal: AbortSignal.timeout(500) });
+        await fetch('http://localhost:3001/health', { signal: AbortSignal.timeout(500) });
         assert.fail('Should not have HTTP server running in stdio mode');
     }
     catch (error) {
