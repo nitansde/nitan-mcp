@@ -9,14 +9,16 @@ set -euo pipefail
 #
 # Optional env vars:
 #   GCP_ZONE      - VM zone (default: us-west1-c)
-#   DISCOURSE_SITE - Discourse site URL (default: uscardforum.com)
+#   DISCOURSE_SITE - Discourse site URL (default: https://www.uscardforum.com)
 #   NITAN_PORT    - HTTP server port (default: 3001)
 #   NITAN_BRANCH  - Git branch to deploy (default: main)
+#   NITAN_PROFILE - Profile file path (default: profile.json)
 
 GCP_ZONE="${GCP_ZONE:-us-west1-c}"
-DISCOURSE_SITE="${DISCOURSE_SITE:-uscardforum.com}"
+DISCOURSE_SITE="${DISCOURSE_SITE:-https://www.uscardforum.com}"
 NITAN_PORT="${NITAN_PORT:-3001}"
 NITAN_BRANCH="${NITAN_BRANCH:-main}"
+NITAN_PROFILE="${NITAN_PROFILE:-profile.json}"
 
 if [[ -z "${GCP_PROJECT:-}" || -z "${GCP_INSTANCE:-}" ]]; then
   echo "Usage: GCP_PROJECT=<project> GCP_INSTANCE=<instance> $0"
@@ -27,9 +29,10 @@ if [[ -z "${GCP_PROJECT:-}" || -z "${GCP_INSTANCE:-}" ]]; then
   echo ""
   echo "Optional:"
   echo "  GCP_ZONE       - VM zone (default: us-west1-c)"
-  echo "  DISCOURSE_SITE - Discourse site (default: uscardforum.com)"
+  echo "  DISCOURSE_SITE - Discourse site (default: https://www.uscardforum.com)"
   echo "  NITAN_PORT     - HTTP port (default: 3001)"
   echo "  NITAN_BRANCH   - Git branch (default: main)"
+  echo "  NITAN_PROFILE  - Profile file (default: profile.json)"
   exit 1
 fi
 
@@ -57,22 +60,23 @@ if [[ "$HAS_PROFILE" == "no" ]]; then
   echo "*** After authorizing, profile.json should be created. ***"
 fi
 
-echo "==> Stopping existing nitan-mcp tmux session (if any)..."
-$SSH "tmux kill-session -t nitan-mcp 2>/dev/null || true"
+echo "==> Stopping existing nitan-mcp and freeing port ${NITAN_PORT}..."
+$SSH "tmux kill-session -t nitan-mcp 2>/dev/null || true; sudo fuser -k ${NITAN_PORT}/tcp 2>/dev/null || true; sleep 2"
 
 echo "==> Starting nitan-mcp HTTP server in tmux..."
-$SSH "cd ~/nitan-mcp && tmux new-session -d -s nitan-mcp 'node dist/index.js --site=${DISCOURSE_SITE} --transport=http --port=${NITAN_PORT} --http-allow-reuse 2>&1 | tee /tmp/nitan-mcp.log'"
+$SSH "cd ~/nitan-mcp && tmux new-session -d -s nitan-mcp 'node dist/index.js --profile ${NITAN_PROFILE} --site=${DISCOURSE_SITE} --transport=http --port=${NITAN_PORT} --http-allow-reuse 2>&1 | tee /tmp/nitan-mcp.log'"
 
 echo "==> Waiting for server to start..."
-sleep 3
-$SSH "curl -sf http://localhost:${NITAN_PORT}/ >/dev/null 2>&1 && echo 'Server is running!' || echo 'Warning: server may not be ready yet'"
+sleep 4
+$SSH "curl -sf http://localhost:${NITAN_PORT}/health >/dev/null 2>&1 && echo 'Server is running!' || (echo 'Server failed to start:' && tail -5 /tmp/nitan-mcp.log)"
 
 echo "==> Configuring Tailscale Funnel on port ${NITAN_PORT}..."
-$SSH "sudo tailscale funnel ${NITAN_PORT}"
+$SSH "sudo tailscale funnel --bg ${NITAN_PORT} 2>/dev/null || sudo tailscale funnel ${NITAN_PORT} &"
+sleep 2
 
+HOSTNAME=$($SSH "tailscale status --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d[\"Self\"][\"DNSName\"].rstrip(\".\"))'" 2>/dev/null || echo "<tailscale-hostname>")
 echo ""
 echo "==> Deployment complete!"
-HOSTNAME=$($SSH "tailscale status --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d[\"Self\"][\"DNSName\"].rstrip(\".\"))'" 2>/dev/null || echo "<tailscale-hostname>")
 echo "    MCP endpoint: https://${HOSTNAME}/mcp"
 echo ""
 echo "    To register with poke.com, run:"

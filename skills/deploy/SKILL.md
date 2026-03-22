@@ -25,9 +25,10 @@ POKE_SESSION_TOKEN=xxx MCP_ENDPOINT=https://host.ts.net/mcp ./setup-poke.sh
 | GCP_PROJECT | Yes | - | GCP project ID |
 | GCP_INSTANCE | Yes | - | VM instance name |
 | GCP_ZONE | No | us-west1-c | VM zone |
-| DISCOURSE_SITE | No | uscardforum.com | Discourse site URL |
+| DISCOURSE_SITE | No | https://www.uscardforum.com | Discourse site URL (must include protocol) |
 | NITAN_PORT | No | 3001 | HTTP server port |
 | NITAN_BRANCH | No | main | Git branch to deploy |
+| NITAN_PROFILE | No | profile.json | Profile file with auth_pairs |
 | POKE_SESSION_TOKEN | Yes* | - | poke.com session cookie |
 | MCP_ENDPOINT | Yes* | - | MCP server URL |
 | CONNECTION_NAME | No | USCardForum MCP | poke.com display name |
