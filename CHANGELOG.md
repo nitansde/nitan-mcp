@@ -28,7 +28,7 @@ Changelog
 
 * add optional HTTP transport support via --transport flag
 * implement Streamable HTTP transport (stateless mode) as alternative to stdio
-* add --port flag for configuring HTTP server port (default: 3000)
+* add --port flag for configuring HTTP server port (default: 3001)
 * include health check endpoint at /health for HTTP mode
 
 ### [0.1.6](https://github.com/SamSaffron/discourse-mcp/compare/v0.1.5...v0.1.6) (2025-10-16)
