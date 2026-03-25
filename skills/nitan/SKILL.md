@@ -8,6 +8,20 @@ metadata: {"openclaw":{"homepage":"https://github.com/nitansde/nitan-mcp","requi
 
 Use this skill as a thin bridge to the existing local MCP server. Do not reimplement forum logic in the skill.
 
+## Setup: Generate user API key
+
+Run once to authenticate and save the API key to the local profile:
+
+```bash
+node --security-revert=CVE-2023-46809 /home/opc/nitan-mcp/dist/index.js generate-user-api-key \
+    --site https://www.uscardforum.com \
+    --save-to /home/opc/.claude/nitan-profile.json
+```
+
+- `--security-revert=CVE-2023-46809` is required to allow the HTTP request used during key generation.
+- The saved profile (`nitan-profile.json`) is picked up automatically by subsequent MCP sessions.
+- This step is only needed once (or when re-authenticating).
+
 ## Runtime assumptions (stdio only)
 
 - Assume the user already has a local MCP client that launches this server via stdio.
