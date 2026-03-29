@@ -6,6 +6,8 @@ import {
   BrowserFallbackRelayUnavailableError,
   type BrowserFallbackOptions,
 } from "./browser_fallback.js";
+import { NodriverCookieClient } from "./nodriver_cookie.js";
+
 
 export type AuthMode =
   | { type: "none" }
@@ -49,6 +51,8 @@ export class HttpClient {
   private bypassMethod: BypassMethod;
   private cloudscraperFailed = false; // Track if cloudscraper has failed
   private browserFallbackClient?: BrowserFallbackClient;
+  private nodriverClient: NodriverCookieClient;
+  private nodriverAttempted = false; // Prevent multiple attempts per request cycle
 
   constructor(private opts: HttpClientOptions) {
     this.base = new URL(opts.baseUrl);
@@ -82,6 +86,8 @@ export class HttpClient {
       this.browserFallbackClient = new BrowserFallbackClient(this.opts.logger, opts.browserFallback);
       this.opts.logger.info("Browser fallback enabled");
     }
+
+    this.nodriverClient = new NodriverCookieClient(opts.logger, opts.pythonPath);
   }
 
   private headers(): Record<string, string> {
@@ -105,7 +111,7 @@ export class HttpClient {
     
     // Add Referer header for subsequent requests
     if (this.lastUrl) {
-      h["Referer"] = "https://www.uscardforum.com/";
+      h["Referer"] = this.base.origin + "/";
     }
     
     // Add cookies if we have any
@@ -166,8 +172,9 @@ export class HttpClient {
       headers["Content-Type"] = "application/json";
     }
 
+    this.nodriverAttempted = false; // Reset per request cycle
     this.opts.logger.debug(`HTTP ${method} ${url}`);
-    
+
     // Log request headers for debugging
     this.opts.logger.debug(`Request headers: ${JSON.stringify(headers, null, 2)}`);
     
@@ -351,6 +358,42 @@ export class HttpClient {
     return typeof maybeJson === "string" ? response.body : maybeJson;
   }
 
+  /**
+   * Launch Chrome via nodriver to solve CF challenge.
+   * The browser proxies the original API request, so we get the response directly.
+   * Also injects any extracted cookies for subsequent requests.
+   */
+  private async tryNodriverAndRetry(method: string, url: string): Promise<any | undefined> {
+    if (this.nodriverAttempted) return undefined;
+    this.nodriverAttempted = true;
+
+    const result = await this.nodriverClient.extractAndProxy(url);
+    if (!result?.success) return undefined;
+
+    // Inject extracted cookies for future requests
+    if (result.cookies) {
+      for (const [key, value] of Object.entries(result.cookies)) {
+        this.cookies.set(key, value);
+      }
+      this.opts.logger.info(`Injected ${Object.keys(result.cookies).length} cookies from nodriver`);
+    }
+
+    // If the browser proxied the request, use that response directly
+    if (result.proxied_response && result.proxied_response.status === 200) {
+      this.opts.logger.info(`Using proxied response from nodriver (status ${result.proxied_response.status})`);
+      const body = result.proxied_response.body;
+      try {
+        return JSON.parse(body);
+      } catch {
+        return body;
+      }
+    }
+
+    // Proxied request failed — cookies were injected for the next request cycle
+    this.opts.logger.info("Nodriver proxy failed, cookies injected for next request");
+    return undefined;
+  }
+
   private async requestViaBypass(method: string, url: string, headers: Record<string, string>, body?: unknown): Promise<any> {
     // Convert cookies Map to object
     const cookiesObj: Record<string, string> = {};
@@ -405,13 +448,17 @@ export class HttpClient {
         // Check for HTTP errors / Cloudflare challenge
         if (result.status && result.status >= 400) {
           const isChallenge = this.isCloudflareChallenge(result.status, result.body, result.headers);
-          if (isChallenge && this.browserFallbackClient?.isEnabled()) {
-            this.opts.logger.info(`Cloudflare challenge detected via cloudscraper (${result.status}), switching to browser fallback`);
+          if ((isChallenge || result.status === 403) && this.browserFallbackClient?.isEnabled()) {
+            this.opts.logger.info(`${isChallenge ? 'Cloudflare challenge' : 'HTTP 403'} detected via cloudscraper (${result.status}), switching to browser fallback`);
             return await this.tryBrowserFallback(method, url, headers, body);
           }
 
           const errorBody = safeJson(result.body || "");
           this.opts.logger.error(`HTTP ${result.status} for ${method} ${url}: ${result.body}`);
+          // On 403, let it fall through to try the next bypass method
+          if (result.status === 403) {
+            throw new Error(`HTTP 403 Forbidden for ${method} ${url}`);
+          }
           throw new HttpError(result.status, `HTTP ${result.status}`, errorBody);
         }
 
@@ -432,7 +479,7 @@ export class HttpClient {
           throw e;
         }
         if (e instanceof HttpError) {
-          throw e; // Don't fallback on HTTP errors (4xx, 5xx)
+          throw e; // Don't fallback on non-403 HTTP errors (4xx, 5xx)
         }
         
         lastError = e;
@@ -482,9 +529,15 @@ export class HttpClient {
         // Check for HTTP errors / Cloudflare challenge
         if (result.status && result.status >= 400) {
           const isChallenge = this.isCloudflareChallenge(result.status, result.body, result.headers);
-          if (isChallenge && this.browserFallbackClient?.isEnabled()) {
-            this.opts.logger.info(`Cloudflare challenge detected via curl_cffi (${result.status}), switching to browser fallback`);
+          if ((isChallenge || result.status === 403) && this.browserFallbackClient?.isEnabled()) {
+            this.opts.logger.info(`${isChallenge ? 'Cloudflare challenge' : 'HTTP 403'} detected via curl_cffi (${result.status}), switching to browser fallback`);
             return await this.tryBrowserFallback(method, url, headers, body);
+          }
+
+          // On CF challenge 403, try nodriver cookie extraction as last resort
+          if (isChallenge || result.status === 403) {
+            const nodriverResult = await this.tryNodriverAndRetry(method, url);
+            if (nodriverResult !== undefined) return nodriverResult;
           }
 
           const errorBody = safeJson(result.body || "");

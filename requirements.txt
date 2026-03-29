@@ -1,3 +1,4 @@
 cloudscraper>=1.2.71
 brotli>=1.0.9
 curl-cffi>=0.5.0
+nodriver>=0.38
