@@ -33,8 +33,8 @@ def get_session(base_url: str) -> requests.Session:
 
     # Create new session if URL changed or doesn't exist
     if _session_instance is None or _base_url != base_url:
-        # Use chrome110 impersonation for better Cloudflare compatibility on datacenter IPs
-        _session_instance = requests.Session(impersonate="chrome110")
+        # Use firefox144 impersonation for better Cloudflare compatibility
+        _session_instance = requests.Session(impersonate="firefox144")
         _base_url = base_url
 
         # Warm up session with base URL to establish Cloudflare cookies
