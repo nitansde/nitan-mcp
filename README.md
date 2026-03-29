@@ -78,7 +78,7 @@ npx -y @nitansde/mcp@latest
 
 **If Python dependencies aren't installed automatically:**
 ```bash
-.venv/bin/python -m pip install cloudscraper curl-cffi
+.venv/bin/python -m pip install cloudscraper curl-cffi nodriver
 # Or install from requirements.txt (recommended)
 .venv/bin/python -m pip install -r requirements.txt
 ```
