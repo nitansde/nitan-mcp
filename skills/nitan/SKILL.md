@@ -8,19 +8,63 @@ metadata: {"openclaw":{"homepage":"https://github.com/nitansde/nitan-mcp","requi
 
 Use this skill as a thin bridge to the existing local MCP server. Do not reimplement forum logic in the skill.
 
-## Setup: Generate user API key
+## Setup: Authenticate via URL authorization (default)
 
-Run once to authenticate and save the API key to the local profile:
+Authentication uses Discourse's User API Key OAuth flow. **Never ask the user for their username or password.** The URL-based flow is always available regardless of where the server is running — local machine, GCP, Docker, Oracle Cloud — and exposes no credentials in chat.
+
+### The flow (3 steps, works everywhere)
+
+**Step 1 — Generate keypair + authorization URL on the server:**
 
 ```bash
-node --security-revert=CVE-2023-46809 /home/opc/nitan-mcp/dist/index.js generate-user-api-key \
-    --site https://www.uscardforum.com \
-    --save-to /home/opc/.claude/nitan-profile.json
+node --security-revert=CVE-2023-46809 -e "
+import { generateKeyPairSync } from 'node:crypto';
+import { writeFileSync } from 'node:fs';
+const { publicKey, privateKey } = generateKeyPairSync('rsa', {
+  modulusLength: 2048,
+  publicKeyEncoding: { type: 'spki', format: 'pem' },
+  privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+});
+const nonce = Date.now().toString();
+const clientId = 'nitan-mcp-' + nonce;
+const url = new URL('https://www.uscardforum.com/user-api-key/new');
+url.search = new URLSearchParams({ application_name: 'Nitan MCP', client_id: clientId, scopes: 'read,write', public_key: publicKey, nonce }).toString();
+writeFileSync('/tmp/nitan_private.pem', privateKey);
+writeFileSync('/tmp/nitan_meta.json', JSON.stringify({ nonce, clientId }));
+console.log(url.toString());
+" 2>/dev/null
 ```
 
-- `--security-revert=CVE-2023-46809` is required to allow the HTTP request used during key generation.
-- The saved profile (`nitan-profile.json`) is picked up automatically by subsequent MCP sessions.
-- This step is only needed once (or when re-authenticating).
+**Step 2 — Send the URL to the user; user authorizes in browser:**
+
+Send the URL to the user via the current chat channel (Discord, Claude Code, etc.). The user opens it, logs in to uscardforum.com, and clicks "Authorize". The browser redirects to `discourse://auth_redirect?payload=XXXX` — since no desktop app handles that scheme, the redirect fails visibly. The user copies the `payload=` value from the address bar and pastes it back in chat.
+
+**Step 3 — Decrypt payload and save profile:**
+
+```bash
+PAYLOAD="<value pasted by user>"
+node --security-revert=CVE-2023-46809 -e "
+import { privateDecrypt, constants } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
+const key = readFileSync('/tmp/nitan_private.pem', 'utf8');
+const meta = JSON.parse(readFileSync('/tmp/nitan_meta.json', 'utf8'));
+const buf = Buffer.from(process.env.PAYLOAD.replace(/\s/g,''), 'base64');
+const result = JSON.parse(privateDecrypt({ key, padding: constants.RSA_PKCS1_PADDING }, buf).toString());
+const profilePath = process.env.NITAN_PROFILE_PATH || '/home/opc/.claude/nitan-profile.json';
+let profile = {};
+try { profile = JSON.parse(readFileSync(profilePath, 'utf8')); } catch {}
+if (!profile.auth_pairs) profile.auth_pairs = [];
+profile.auth_pairs = profile.auth_pairs.filter(p => p.site !== 'https://www.uscardforum.com/');
+profile.auth_pairs.push({ site: 'https://www.uscardforum.com/', user_api_key: result.key, user_api_client_id: meta.clientId });
+writeFileSync(profilePath, JSON.stringify(profile, null, 2));
+console.log('Saved.');
+" 2>/dev/null
+rm /tmp/nitan_private.pem /tmp/nitan_meta.json
+```
+
+Done. The profile is saved and picked up automatically on next server start. No username or password was ever shared.
+
+> If the tool returns `not_logged_in` / 403 after this, re-run step 1 to generate a fresh key (tokens can expire or be revoked).
 
 ## Runtime assumptions (stdio only)
 
@@ -59,10 +103,11 @@ node --security-revert=CVE-2023-46809 /home/opc/nitan-mcp/dist/index.js generate
 
 ## Authentication behavior
 
-- `NITAN_USERNAME` and `NITAN_PASSWORD` are optional for public read-only usage.
-- `discourse_list_notifications` requires login.
-- If the server returns login errors (`not_logged_in` / 403), ask the user to configure env credentials in MCP config (not in chat).
-- Optional: user can set `TIMEZONE` env if they want localized timestamps.
+- Public read-only tools (`discourse_search`, `discourse_read_topic`, etc.) work without any authentication.
+- `discourse_list_notifications` and write tools require a valid User API Key in the profile.
+- **Never ask the user for their username or password.** Always use the URL authorization flow above.
+- If a tool returns `not_logged_in` / 403, trigger the 3-step URL authorization flow to refresh the key — do not prompt for credentials.
+- Optional: user can set `TIMEZONE` env for localized timestamps.
 
 ## Tool usage map
 

@@ -85,7 +85,7 @@ const ProfileSchema = z
       .default(50000)
       .describe("Maximum number of characters to include when returning post content (set via --max-read-length)"),
     transport: z.enum(["stdio", "http"]).optional().default("stdio").describe("Transport type: stdio (default) or http"),
-    port: z.number().int().positive().optional().default(3000).describe("Port to listen on when using HTTP transport"),
+    port: z.number().int().positive().optional().default(3001).describe("Port to listen on when using HTTP transport"),
     use_cloudscraper: z.boolean().optional().describe("(Deprecated: use bypass_method instead) Use Python cloudscraper to bypass Cloudflare"),
     bypass_method: z.enum(["cloudscraper", "curl_cffi", "both"]).optional().default("both").describe("Cloudflare bypass method: 'cloudscraper', 'curl_cffi', or 'both' (default - tries cloudscraper with curl_cffi fallback)"),
     python_path: z.string().optional().default(getDefaultPythonPath()).describe("Path to Python executable for bypass methods (defaults to local .venv python when available)"),
@@ -97,6 +97,7 @@ const ProfileSchema = z
     login_wait_timeout_ms: z.number().int().positive().optional().default(180000),
     login_check_url: z.string().url().optional(),
     skip_site_validation: z.boolean().optional().default(false).describe("Skip --site pre-validation (useful for tests)"),
+    http_allow_reuse: z.boolean().optional().default(false).describe("Enable stateful session persistence for HTTP transport (required for MCP SDK >= 1.27.0)"),
   })
   .strict();
 
@@ -587,9 +588,10 @@ async function main() {
 
   // Create transport based on configuration
   if (config.transport === "http") {
-    // HTTP transport using Streamable HTTP (stateless mode)
+    // HTTP transport using Streamable HTTP
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined, // Stateless mode
+      // Stateless mode by default, or persistent sessions if reuse is allowed
+      sessionIdGenerator: config.http_allow_reuse ? () => "nitan-session" : undefined,
       enableJsonResponse: true,
     });
 

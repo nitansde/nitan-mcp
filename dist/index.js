@@ -12,7 +12,6 @@ if (majorVersion < 18) {
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { createServer } from "node:http";
-import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -73,8 +72,7 @@ const ProfileSchema = z
         .default(50000)
         .describe("Maximum number of characters to include when returning post content (set via --max-read-length)"),
     transport: z.enum(["stdio", "http"]).optional().default("stdio").describe("Transport type: stdio (default) or http"),
-    port: z.number().int().positive().optional().default(3001).describe("Port to listen on when using HTTP transport"),
-    http_allow_reuse: z.boolean().optional().default(false).describe("Allow HTTP transport reuse across requests (uses stateful session mode). Required when deploying as a persistent HTTP server with MCP SDK >=1.27.0."),
+    port: z.number().int().positive().optional().default(3000).describe("Port to listen on when using HTTP transport"),
     use_cloudscraper: z.boolean().optional().describe("(Deprecated: use bypass_method instead) Use Python cloudscraper to bypass Cloudflare"),
     bypass_method: z.enum(["cloudscraper", "curl_cffi", "both"]).optional().default("both").describe("Cloudflare bypass method: 'cloudscraper', 'curl_cffi', or 'both' (default - tries cloudscraper with curl_cffi fallback)"),
     python_path: z.string().optional().default(getDefaultPythonPath()).describe("Path to Python executable for bypass methods (defaults to local .venv python when available)"),
@@ -205,8 +203,7 @@ function mergeConfig(profile, flags) {
         default_search: ((flags.default_search ?? flags["default-search"]) ?? profile.default_search),
         max_read_length: ((flags.max_read_length ?? flags["max-read-length"]) ?? profile.max_read_length ?? 50000),
         transport: (flags.transport ?? profile.transport ?? "stdio"),
-        port: (flags.port ?? profile.port ?? 3001),
-        http_allow_reuse: ((flags.http_allow_reuse ?? flags["http-allow-reuse"]) ?? profile.http_allow_reuse ?? false),
+        port: (flags.port ?? profile.port ?? 3000),
         use_cloudscraper: ((flags.use_cloudscraper ?? flags["use-cloudscraper"]) ?? profile.use_cloudscraper),
         bypass_method: ((flags.bypass_method ?? flags["bypass-method"]) ?? profile.bypass_method ?? "both"),
         python_path: ((flags.python_path ?? flags["python-path"]) ?? profile.python_path ?? getDefaultPythonPath()),
@@ -567,18 +564,11 @@ async function main() {
     }
     // Create transport based on configuration
     if (config.transport === "http") {
-        // HTTP transport using Streamable HTTP
-        // By default: stateless mode (sessionIdGenerator: undefined), which means the transport
-        // can only handle a single request per instance (MCP SDK >=1.27.0 restriction).
-        // With --http-allow-reuse: stateful session mode, allowing the transport to serve
-        // multiple requests. Required for persistent HTTP server deployments.
+        // HTTP transport using Streamable HTTP (stateless mode)
         const transport = new StreamableHTTPServerTransport({
-            sessionIdGenerator: config.http_allow_reuse ? () => randomUUID() : undefined,
+            sessionIdGenerator: undefined, // Stateless mode
             enableJsonResponse: true,
         });
-        if (config.http_allow_reuse) {
-            logger.info("HTTP transport: stateful session mode enabled (--http-allow-reuse)");
-        }
         await server.connect(transport);
         const httpServer = createServer(async (req, res) => {
             // Health check endpoint
