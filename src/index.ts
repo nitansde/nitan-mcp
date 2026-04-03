@@ -13,6 +13,7 @@ if (majorVersion < 18) {
 }
 
 import { readFile, writeFile } from "node:fs/promises";
+import crypto from "node:crypto";
 import { existsSync } from "node:fs";
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
@@ -97,7 +98,6 @@ const ProfileSchema = z
     login_wait_timeout_ms: z.number().int().positive().optional().default(180000),
     login_check_url: z.string().url().optional(),
     skip_site_validation: z.boolean().optional().default(false).describe("Skip --site pre-validation (useful for tests)"),
-    http_allow_reuse: z.boolean().optional().default(false).describe("Enable stateful session persistence for HTTP transport (required for MCP SDK >= 1.27.0)"),
   })
   .strict();
 
@@ -590,8 +590,7 @@ async function main() {
   if (config.transport === "http") {
     // HTTP transport using Streamable HTTP
     const transport = new StreamableHTTPServerTransport({
-      // Stateless mode by default, or persistent sessions if reuse is allowed
-      sessionIdGenerator: config.http_allow_reuse ? () => "nitan-session" : undefined,
+      sessionIdGenerator: () => crypto.randomUUID(),
       enableJsonResponse: true,
     });
 

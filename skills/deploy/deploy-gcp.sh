@@ -64,7 +64,7 @@ echo "==> Stopping existing nitan-mcp and freeing port ${NITAN_PORT}..."
 $SSH "tmux kill-session -t nitan-mcp 2>/dev/null || true; sudo fuser -k ${NITAN_PORT}/tcp 2>/dev/null || true; sleep 2"
 
 echo "==> Starting nitan-mcp HTTP server in tmux..."
-$SSH "cd ~/nitan-mcp && tmux new-session -d -s nitan-mcp 'node dist/index.js --profile ${NITAN_PROFILE} --site=${DISCOURSE_SITE} --transport=http --port=${NITAN_PORT} --http-allow-reuse 2>&1 | tee /tmp/nitan-mcp.log'"
+$SSH "cd ~/nitan-mcp && tmux new-session -d -s nitan-mcp 'node dist/index.js --profile ${NITAN_PROFILE} --site=${DISCOURSE_SITE} --transport=http --port=${NITAN_PORT} 2>&1 | tee /tmp/nitan-mcp.log'"
 
 echo "==> Waiting for server to start..."
 sleep 4
