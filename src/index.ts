@@ -774,10 +774,17 @@ async function main() {
               throw new Error("Invalid response: missing 'key' field");
             }
             await saveToProfile(resolvedProfilePath, config.site, result.key, pendingAuthKeys.clientId);
+            // 热更新内存中的 auth，无需重启
+            siteState.updateAuthOverride({
+              site: config.site,
+              user_api_key: result.key,
+              user_api_client_id: pendingAuthKeys.clientId,
+            });
+            siteState.selectSite(config.site);
             logger.info(`Authorization successful — saved to ${resolvedProfilePath}`);
             pendingAuthKeys = null;
             res.writeHead(200, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ status: "ok", message: "Authorization successful. Restart the server to apply." }));
+            res.end(JSON.stringify({ status: "ok", message: "Authorization successful. Auth is now active." }));
           } catch (error: any) {
             logger.error(`Auth callback error: ${error?.message || String(error)}`);
             res.writeHead(500, { "Content-Type": "application/json" });
@@ -815,6 +822,8 @@ async function main() {
           const keyPair = generateKeyPair();
           const nonce = Date.now().toString();
           const clientId = `nitan-mcp-${nonce}`;
+          // 清除内存中的 auth
+          if (config.site) siteState.removeAuthOverride(config.site);
           pendingAuthKeys = { publicKey: keyPair.publicKey, privateKey: keyPair.privateKey, nonce, clientId };
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ status: "ok", message: "Logged out" }));
