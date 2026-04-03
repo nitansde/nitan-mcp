@@ -18,7 +18,7 @@ interface GenerateOptions {
   saveTo?: string;
 }
 
-function generateKeyPair(): KeyPair {
+export function generateKeyPair(): KeyPair {
   const { publicKey, privateKey } = generateKeyPairSync("rsa", {
     modulusLength: 2048,
     publicKeyEncoding: {
@@ -34,7 +34,7 @@ function generateKeyPair(): KeyPair {
   return { publicKey, privateKey };
 }
 
-function buildAuthorizationUrl(options: GenerateOptions, publicKey: string): string {
+export function buildAuthorizationUrl(options: GenerateOptions, publicKey: string): string {
   const url = new URL(`${options.site}/user-api-key/new`);
 
   const params = new URLSearchParams({
@@ -49,7 +49,7 @@ function buildAuthorizationUrl(options: GenerateOptions, publicKey: string): str
   return url.toString();
 }
 
-function decryptPayload(encryptedPayload: string, privateKey: string): string {
+export function decryptPayload(encryptedPayload: string, privateKey: string): string {
   try {
     const buffer = Buffer.from(encryptedPayload, "base64");
     const decrypted = privateDecrypt(
@@ -79,7 +79,7 @@ async function promptForInput(question: string): Promise<string> {
   });
 }
 
-async function saveToProfile(
+export async function saveToProfile(
   profilePath: string,
   site: string,
   userApiKey: string,

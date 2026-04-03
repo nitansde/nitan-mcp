@@ -55,6 +55,7 @@ rm /tmp/nitan_private.pem /tmp/nitan_meta.json
 ```
 
 The saved `profile.json` is what `NITAN_PROFILE` points to in deploy-gcp.sh. Run this once before deploying, or re-run when a token expires (server returns 403).
+
 ## Scripts
 
 ### deploy-gcp.sh
