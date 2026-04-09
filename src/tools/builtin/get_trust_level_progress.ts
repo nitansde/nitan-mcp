@@ -32,6 +32,14 @@ const METRIC_LABELS: Record<string, string> = {
   time_read: "Time Read (seconds)",
 };
 
+const TRUST_LEVEL_LABELS: Record<number, string> = {
+  0: "New",
+  1: "Basic",
+  2: "Member",
+  3: "Regular",
+  4: "Leader",
+};
+
 export const registerGetTrustLevelProgress: RegisterFn = (server, ctx) => {
   const schema = z.object({
     username: z.string().min(1),
@@ -48,25 +56,20 @@ export const registerGetTrustLevelProgress: RegisterFn = (server, ctx) => {
     async ({ username }) => {
       try {
         const { client } = ctx.siteState.ensureSelectedSite();
+        const normalizedUsername = username.toLowerCase();
 
-        // Fetch all three data sources in parallel
-        const [siteData, summaryData, dirData] = await Promise.all([
-          client.get("/about.json") as Promise<any>,
-          client.get(`/u/${encodeURIComponent(username)}/summary.json`) as Promise<any>,
-          client.get(
-            `/directory_items?period=quarterly&order=days_visited&name=${encodeURIComponent(username)}`
-          ) as Promise<any>,
-        ]);
+        const summaryData = await (client.get(`/u/${encodeURIComponent(username)}/summary.json`) as Promise<any>);
+        const dirData = await (client.get(
+          `/directory_items.json?period=quarterly&order=days_visited&name=${encodeURIComponent(username)}`
+        ) as Promise<any>);
 
-        // Parse summary stats
-        const summaryStats: Record<string, any> = summaryData?.user_summary || {};
+        const summaryStats: Record<string, unknown> = summaryData?.user_summary || {};
         const summaryTrustLevel: number = summaryData?.users?.[0]?.trust_level ?? 0;
 
-        // Parse directory stats
         const dirItems: any[] = dirData?.directory_items || [];
-        const dirItem = dirItems.find((i: any) => i.user?.username === username) || dirItems[0];
+        const dirItem = dirItems.find((item: any) => item?.user?.username?.toLowerCase?.() === normalizedUsername);
 
-        let dirTrustLevel = 0;
+        let dirTrustLevel: number | null = null;
         const dirStats: Record<string, number | null> = {
           days_visited: null,
           likes_given: null,
@@ -84,22 +87,34 @@ export const registerGetTrustLevelProgress: RegisterFn = (server, ctx) => {
           dirStats.posts_count = dirItem.post_count ?? null;
           dirStats.topics_entered = dirItem.topics_entered ?? null;
           dirStats.posts_read_count = dirItem.posts_read ?? null;
-          dirTrustLevel = dirItem.user?.trust_level ?? 0;
+          dirTrustLevel = dirItem.user?.trust_level ?? null;
         }
 
-        // Merge stats: directory takes priority over summary
-        const stats: Record<string, any> = { ...summaryStats };
-        Object.entries(dirStats).forEach(([k, v]) => {
-          if (v != null) stats[k] = v;
+        const stats: Record<string, unknown> = { ...summaryStats };
+        Object.entries(dirStats).forEach(([key, value]) => {
+          if (value != null) stats[key] = value;
         });
 
-        const trustLevel: number = dirTrustLevel ?? summaryTrustLevel ?? 0;
-        const isMaintain = trustLevel >= 3;
+        const trustLevel = dirTrustLevel ?? summaryTrustLevel ?? 0;
+        const trustLevelLabel = TRUST_LEVEL_LABELS[trustLevel] || `TL${trustLevel}`;
+        const isHighestLevel = trustLevel >= 4;
+        const isMaintain = trustLevel === 3;
         const tierIndex = isMaintain ? 2 : trustLevel;
 
-        // Dynamic TL2→3 thresholds from site stats
+        const lines: string[] = [
+          `User: @${username}`,
+          `Current Trust Level: ${trustLevel} (${trustLevelLabel})`,
+        ];
+
+        if (isHighestLevel) {
+          lines.push("");
+          lines.push("Highest trust level reached. No further automatic progress applies.");
+          return { content: [{ type: "text", text: lines.join("\n") }] };
+        }
+
         const requirements = { ...TL_REQUIREMENTS[tierIndex] };
         if (tierIndex === 2) {
+          const siteData = await (client.get("/about.json") as Promise<any>);
           const siteStats = siteData?.about?.stats || {};
           requirements.posts_read_count = Math.min(
             Math.floor((siteStats.posts_30_days || 0) / 4),
@@ -111,22 +126,16 @@ export const registerGetTrustLevelProgress: RegisterFn = (server, ctx) => {
           );
         }
 
-        // Format output
         const nextTL = isMaintain ? "TL3 (Retention)" : `TL${tierIndex + 1}`;
-        const lines: string[] = [
-          `User: @${username}`,
-          `Current Trust Level: ${trustLevel}${isMaintain ? " (Regular)" : ""}`,
-          `Progress toward ${nextTL}:`,
-          "",
-        ];
+        lines.push(`Progress toward ${nextTL}:`, "");
 
         let allMet = true;
-        for (const [k, target] of Object.entries(requirements)) {
-          const current = stats[k];
+        for (const [key, target] of Object.entries(requirements)) {
+          const current = stats[key];
           if (current == null) continue;
           const met = Number(current) >= Number(target);
           if (!met) allMet = false;
-          const label = METRIC_LABELS[k] || k;
+          const label = METRIC_LABELS[key] || key;
           const status = met ? "✓" : "✗";
           lines.push(`  ${status} ${label}: ${current} / ${target}`);
         }
