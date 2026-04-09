@@ -152,7 +152,7 @@ test('HTTP transport gracefully handles shutdown', async () => {
   }
 });
 
-test('health and auth page adapt to forwarded host for unauthenticated auth flow', async () => {
+test('health adapts to forwarded host and auth page uses manual payload flow', async () => {
   const port = await getFreePort();
   const indexPath = path.resolve(__dirname, '../../dist/index.js');
   const workdir = createTempDir('nitan-auth-flow-');
@@ -185,11 +185,14 @@ test('health and auth page adapt to forwarded host for unauthenticated auth flow
     assert.equal(authResponse.status, 200);
     const html = await authResponse.text();
     assert.match(html, /Not Authenticated/);
+    assert.match(html, /Authorize in the new tab, then copy the encrypted payload shown by Discourse and paste it below/);
     assert.match(html, /Paste authorization payload here:/);
     assert.match(html, /Authorize on Discourse/);
 
     const authUrl = extractAuthUrl(html);
-    assert.equal(authUrl.searchParams.get('auth_redirect'), 'https://funnel.example.ts.net/auth/callback');
+    assert.equal(authUrl.origin, 'https://www.uscardforum.com');
+    assert.equal(authUrl.pathname, '/user-api-key/new');
+    assert.equal(authUrl.searchParams.get('auth_redirect'), null);
   } finally {
     await stopServer(serverProcess);
     await rm(workdir, { recursive: true, force: true });

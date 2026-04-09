@@ -624,7 +624,7 @@ async function main() {
       return `http://localhost:${config.port}`;
     }
 
-    function buildPendingAuthUrl(req: import("node:http").IncomingMessage): string | null {
+    function buildPendingAuthUrl(): string | null {
       if (!pendingAuthKeys || !config.site) return null;
       return buildAuthorizationUrl(
         {
@@ -633,7 +633,6 @@ async function main() {
           clientId: pendingAuthKeys.clientId,
           nonce: pendingAuthKeys.nonce,
           scopes: "read",
-          authRedirect: `${getCallbackBaseUrl(req)}/auth/callback`,
         },
         pendingAuthKeys.publicKey
       );
@@ -660,7 +659,7 @@ async function main() {
 
       // Auth page endpoint
       if (req.method === "GET" && parsedUrl.pathname === "/auth") {
-        const authUrl = buildPendingAuthUrl(req);
+        const authUrl = buildPendingAuthUrl();
         const isAuthenticated = !pendingAuthKeys;
         const html = `
 <!DOCTYPE html>
@@ -696,6 +695,7 @@ async function main() {
       !isAuthenticated
         ? `
       <p>Target site: <code>${config.site}</code></p>
+      <p>Authorize in the new tab, then copy the encrypted payload shown by Discourse and paste it below.</p>
       <a href="${authUrl}" target="_blank" class="btn">Authorize on Discourse</a>
       <form id="callbackForm">
         <label for="payload">Paste authorization payload here:</label>
