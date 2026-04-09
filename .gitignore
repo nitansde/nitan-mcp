@@ -6,3 +6,4 @@ my-login.json
 cookies.json
 dist-skill/*
 .DS_STORE
+.venv/*
