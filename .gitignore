@@ -6,3 +6,6 @@ my-login.json
 cookies.json
 dist-skill/*
 .DS_STORE
+.venv/*
+.playwright-mcp/*
+.cursor/*

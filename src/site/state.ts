@@ -86,6 +86,54 @@ export class SiteState {
     return { base, client };
   }
 
+  hasAuthForSite(siteUrl: string): boolean {
+    const base = normalizeBase(siteUrl);
+    return this.resolveAuthForSite(base).type !== "none";
+  }
+
+  // 热更新 auth — 替换或追加指定 site 的认证信息，并清除缓存的 client
+  updateAuthOverride(override: AuthOverride): void {
+    if (!this.opts.authOverrides) this.opts.authOverrides = [];
+    const base = normalizeBase(override.site);
+    const idx = this.opts.authOverrides.findIndex(
+      (o) => normalizeBase(o.site) === base || this.sameOrigin(o.site, base)
+    );
+    if (idx >= 0) {
+      this.opts.authOverrides[idx] = override;
+    } else {
+      this.opts.authOverrides.push(override);
+    }
+    // 清除该 site 的缓存 client，下次 buildClientForSite 会用新 auth 重建
+    const cached = this.clientCache.get(base);
+    if (cached) {
+      cached.dispose().catch(() => {});
+      this.clientCache.delete(base);
+    }
+    // 如果当前选中的就是这个 site，也清掉让它重建
+    if (this.currentSiteBase === base) {
+      this.currentSiteBase = undefined;
+      this.currentClient = undefined;
+    }
+  }
+
+  // 移除指定 site 的认证信息并清除缓存
+  removeAuthOverride(siteUrl: string): void {
+    if (!this.opts.authOverrides) return;
+    const base = normalizeBase(siteUrl);
+    this.opts.authOverrides = this.opts.authOverrides.filter(
+      (o) => normalizeBase(o.site) !== base && !this.sameOrigin(o.site, base)
+    );
+    const cached = this.clientCache.get(base);
+    if (cached) {
+      cached.dispose().catch(() => {});
+      this.clientCache.delete(base);
+    }
+    if (this.currentSiteBase === base) {
+      this.currentSiteBase = undefined;
+      this.currentClient = undefined;
+    }
+  }
+
   async dispose(): Promise<void> {
     const clients = Array.from(new Set(this.clientCache.values()));
     await Promise.allSettled(clients.map((client) => client.dispose()));

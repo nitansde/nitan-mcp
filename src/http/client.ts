@@ -226,6 +226,11 @@ export class HttpClient {
         if (!res.ok) {
           const text = await safeText(res);
           const errorBody = safeJson(text);
+          const isChallenge = this.isCloudflareChallenge(res.status, text, responseHeaders);
+          if (isChallenge && this.browserFallbackClient?.isEnabled()) {
+            this.opts.logger.info(`Cloudflare challenge detected via native fetch (${res.status}), switching to browser fallback`);
+            return await this.tryBrowserFallback(method, url, headers, body);
+          }
           this.opts.logger.error(`HTTP ${res.status} ${res.statusText} for ${method} ${url}: ${text}`);
           throw new HttpError(res.status, `HTTP ${res.status} ${res.statusText}`, errorBody);
         }

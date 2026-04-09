@@ -350,6 +350,88 @@ function createChallengeThenRecoverPlaywrightModule() {
   };
 }
 
+function createHeaderAwareGetPlaywrightModule() {
+  let launchPersistentContextCalls = 0;
+  let newPageCalls = 0;
+  let closeCalls = 0;
+  let currentUrl = "about:blank";
+  let pageClosed = false;
+  let evaluateCalls = 0;
+  let lastFetchRequest: any = null;
+  const gotoUrls: string[] = [];
+
+  const page = {
+    isClosed: () => pageClosed,
+    goto: async (url: string) => {
+      currentUrl = url;
+      gotoUrls.push(url);
+      return {
+        status: () => 200,
+        headers: () => ({ "content-type": "text/html" }),
+        text: async () => `<html><body>${url}</body></html>`,
+      };
+    },
+    content: async () => `<html><body>${currentUrl}</body></html>`,
+    url: () => currentUrl,
+    evaluate: async (_fn: unknown, req: any) => {
+      evaluateCalls += 1;
+      lastFetchRequest = req;
+      return {
+        status: 200,
+        body: '{"ok":true}',
+        headers: { "content-type": "application/json" },
+        finalUrl: req.url,
+      };
+    },
+  };
+
+  const pages: Array<typeof page> = [];
+  const context = {
+    pages: () => pages.filter((candidate) => !candidate.isClosed()),
+    newPage: async () => {
+      newPageCalls += 1;
+      pages.push(page);
+      return page;
+    },
+    close: async () => {
+      closeCalls += 1;
+      pageClosed = true;
+    },
+    clearCookies: async () => undefined,
+  };
+
+  return {
+    module: {
+      chromium: {
+        launchPersistentContext: async () => {
+          launchPersistentContextCalls += 1;
+          return context;
+        },
+      },
+    },
+    stats: {
+      get launchPersistentContextCalls() {
+        return launchPersistentContextCalls;
+      },
+      get newPageCalls() {
+        return newPageCalls;
+      },
+      get closeCalls() {
+        return closeCalls;
+      },
+      get evaluateCalls() {
+        return evaluateCalls;
+      },
+      get lastFetchRequest() {
+        return lastFetchRequest;
+      },
+      get gotoUrls() {
+        return gotoUrls;
+      },
+    },
+  };
+}
+
 test("reuses single Playwright context and tab across repeated fallback GET requests", async () => {
   const restorePlatform = overridePlatform("darwin");
   const originalHome = process.env.HOME;
@@ -447,6 +529,48 @@ test("retries implicit managed nitan profile GET once after clearing cookies on 
   }
 });
 
+test("uses browser fetch for GET requests that need custom auth headers", async () => {
+  const restorePlatform = overridePlatform("darwin");
+  const originalHome = process.env.HOME;
+  const homeDir = mkdtempSync(join(tmpdir(), "nitan-playwright-header-fetch-"));
+  process.env.HOME = homeDir;
+
+  const fakePlaywright = createHeaderAwareGetPlaywrightModule();
+  const client = new BrowserFallbackClient(new Logger("silent"), {
+    enabled: true,
+    provider: "playwright",
+    loginProfileName: "Default",
+    playwrightModuleLoader: async () => fakePlaywright.module,
+  });
+
+  try {
+    const nitanProfileDir = join(homeDir, "Library", "Application Support", "NitanMCP", "ChromeProfile", "Default");
+    mkdirSync(nitanProfileDir, { recursive: true });
+
+    const response = await client.request({
+      url: "https://example.com/notifications.json",
+      method: "GET",
+      headers: {
+        "User-Api-Key": "demo-key",
+        "User-Api-Client-Id": "demo-client",
+      },
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body, '{"ok":true}');
+    assert.equal(fakePlaywright.stats.evaluateCalls, 1);
+    assert.deepEqual(fakePlaywright.stats.lastFetchRequest.headers, {
+      "User-Api-Key": "demo-key",
+      "User-Api-Client-Id": "demo-client",
+    });
+    assert.deepEqual(fakePlaywright.stats.gotoUrls, ["https://example.com"]);
+  } finally {
+    await client.dispose();
+    process.env.HOME = originalHome;
+    restorePlatform();
+    rmSync(homeDir, { recursive: true, force: true });
+  }
+});
 test("auto-login is attempted with NITAN env credentials and skipped when env is missing", async () => {
   const restorePlatform = overridePlatform("darwin");
   const originalHome = process.env.HOME;

@@ -4,6 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Logger } from '../util/logger.js';
 import { registerAllTools } from '../tools/registry.js';
 import { SiteState } from '../site/state.js';
+import { registerListNotifications } from '../tools/builtin/list_notifications.js';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,18 +26,42 @@ test('registers built-in tools', async () => {
   const logger = new Logger('silent');
   const siteState = createSiteState();
   const server = new McpServer({ name: 'test', version: '0.0.0' }, { capabilities: { tools: { listChanged: false } } });
-  await registerAllTools(server as any, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' });
+  await registerAllTools(server as any, siteState, logger, { toolsMode: 'discourse_api_only' });
   assert.ok(true);
 });
 
-test('registers write-enabled tools when allowWrites=true', async () => {
+function expectedRegisteredToolNames(hideSelectSite = false) {
+  const names = [
+    'discourse_search',
+    '美卡_搜索',
+    'discourse_read_topic',
+    '美卡_读帖',
+    'discourse_get_user_activity',
+    '美卡_用户动态',
+    'discourse_list_hot_topics',
+    '美卡_热帖',
+    'discourse_list_notifications',
+    '美卡_通知',
+    'discourse_list_top_topics',
+    '美卡_热榜',
+    'discourse_list_excellent_topics',
+    '美卡_精华',
+    'discourse_list_funny_topics',
+    '美卡_搞笑',
+    'discourse_get_trust_level_progress',
+    '美卡_等级进度',
+  ];
+
+  return hideSelectSite ? names : ['discourse_select_site', '美卡_选站', ...names];
+}
+
+test('built-in tool set contains only read operations', async () => {
   const logger = new Logger('silent');
   const siteState = createSiteState();
   const tools: Record<string, { handler: Function }> = {};
   const fakeServer: any = { registerTool(name: string, _meta: any, handler: Function) { tools[name] = { handler }; } };
-  await registerAllTools(fakeServer, siteState, logger, { allowWrites: true, toolsMode: 'discourse_api_only' } as any);
-  assert.ok('discourse_create_post' in tools);
-  assert.ok('discourse_create_category' in tools);
+  await registerAllTools(fakeServer, siteState, logger, { toolsMode: 'discourse_api_only' } as any);
+  assert.deepEqual(Object.keys(tools).sort(), expectedRegisteredToolNames(false).sort());
 });
 
 async function readFixture(name: string) {
@@ -59,7 +84,7 @@ test('select-site then search flow works with mocked HTTP', async () => {
   const siteState = createSiteState();
   const tools: Record<string, { handler: Function }> = {};
   const fakeServer: any = { registerTool(name: string, _meta: any, handler: Function) { tools[name] = { handler }; } };
-  await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' });
+    await registerAllTools(fakeServer, siteState, logger, { toolsMode: 'discourse_api_only' });
 
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async (input: any) => {
@@ -98,7 +123,7 @@ test('tethered mode hides select_site and allows search without selection', asyn
     const { base, client } = siteState.buildClientForSite('https://example.com');
     await client.get('/about.json');
     siteState.selectSite(base);
-    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', hideSelectSite: true } as any);
+    await registerAllTools(fakeServer, siteState, logger, { toolsMode: 'discourse_api_only', hideSelectSite: true } as any);
     assert.ok(!('discourse_select_site' in tools));
     const searchRes = await tools['discourse_search'].handler({ query: 'hello' }, {});
     const text = String(searchRes?.content?.[0]?.text || '');
@@ -128,7 +153,7 @@ test('default-search prefix is applied to queries', async () => {
     const { base, client } = siteState.buildClientForSite('https://example.com');
     await client.get('/about.json');
     siteState.selectSite(base);
-    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', defaultSearchPrefix: 'tag:ai order:latest-post' } as any);
+    await registerAllTools(fakeServer, siteState, logger, { toolsMode: 'discourse_api_only', defaultSearchPrefix: 'tag:ai order:latest-post' } as any);
     await tools['discourse_search'].handler({ query: 'hello world' }, {});
     assert.ok(lastUrl && lastUrl.includes('/search.json?'));
     const qs = lastUrl!.split('?')[1] || '';
@@ -138,6 +163,41 @@ test('default-search prefix is applied to queries', async () => {
   } finally {
     globalThis.fetch = originalFetch as any;
   }
+});
+
+test('notifications tool reports Cloudflare challenge instead of not logged in', async () => {
+  const logger = new Logger('silent');
+  const fakeServerTools: Record<string, { handler: Function }> = {};
+  const fakeServer: any = {
+    registerTool(name: string, _meta: any, handler: Function) {
+      fakeServerTools[name] = { handler };
+    },
+  };
+  const fakeSiteState: any = {
+    ensureSelectedSite() {
+      return {
+        base: 'https://www.uscardforum.com',
+        client: {
+          async get() {
+            throw {
+              status: 403,
+              message: 'HTTP 403 Forbidden',
+              body: '<!DOCTYPE html><html><head><title>Just a moment...</title></head><body>Cloudflare challenge</body></html>',
+            };
+          },
+        },
+      };
+    },
+  };
+
+  registerListNotifications(fakeServer, { siteState: fakeSiteState, maxReadLength: 50000 } as any, { toolsMode: 'discourse_api_only' });
+
+  const result = await fakeServerTools['discourse_list_notifications'].handler({ limit: 5, unread_only: false }, {});
+  const text = String(result?.content?.[0]?.text || '');
+
+  assert.equal(result?.isError, true);
+  assert.match(text, /Cloudflare challenge blocked the request/);
+  assert.doesNotMatch(text, /User is not logged in/);
 });
 
 test('trust-level tool uses directory_items.json and reports TL3 progress from merged stats', async () => {

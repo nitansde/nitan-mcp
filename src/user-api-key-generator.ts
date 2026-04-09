@@ -14,11 +14,12 @@ interface GenerateOptions {
   applicationName?: string;
   clientId?: string;
   nonce?: string;
+  authRedirect?: string;
   payload?: string;
   saveTo?: string;
 }
 
-function generateKeyPair(): KeyPair {
+export function generateKeyPair(): KeyPair {
   const { publicKey, privateKey } = generateKeyPairSync("rsa", {
     modulusLength: 2048,
     publicKeyEncoding: {
@@ -34,22 +35,26 @@ function generateKeyPair(): KeyPair {
   return { publicKey, privateKey };
 }
 
-function buildAuthorizationUrl(options: GenerateOptions, publicKey: string): string {
+export function buildAuthorizationUrl(options: GenerateOptions, publicKey: string): string {
   const url = new URL(`${options.site}/user-api-key/new`);
 
   const params = new URLSearchParams({
     application_name: options.applicationName || "Discourse MCP",
     client_id: options.clientId || "discourse-mcp",
-    scopes: options.scopes || "read,write",
+    scopes: options.scopes || "read",
     public_key: publicKey,
     nonce: options.nonce || Date.now().toString(),
   });
+
+  if (options.authRedirect) {
+    params.set("auth_redirect", options.authRedirect);
+  }
 
   url.search = params.toString();
   return url.toString();
 }
 
-function decryptPayload(encryptedPayload: string, privateKey: string): string {
+export function decryptPayload(encryptedPayload: string, privateKey: string): string {
   try {
     const buffer = Buffer.from(encryptedPayload, "base64");
     const decrypted = privateDecrypt(
@@ -79,7 +84,7 @@ async function promptForInput(question: string): Promise<string> {
   });
 }
 
-async function saveToProfile(
+export async function saveToProfile(
   profilePath: string,
   site: string,
   userApiKey: string,
@@ -118,7 +123,7 @@ Usage: nitan-mcp generate-user-api-key [options]
 
 Options:
   --site <url>              Discourse site URL (required)
-  --scopes <scopes>         Comma-separated scopes (default: read,write)
+  --scopes <scopes>         Comma-separated scopes (default: read)
   --application-name <name> Application name (default: Nitan MCP)
   --client-id <id>          Client ID (default: nitan-mcp)
   --nonce <nonce>           Nonce for request (default: timestamp)
@@ -141,7 +146,7 @@ Examples:
 
   console.error("\n🔑 Discourse User API Key Generator\n");
   console.error(`Site: ${options.site}`);
-  console.error(`Scopes: ${options.scopes || "read,write"}\n`);
+  console.error(`Scopes: ${options.scopes || "read"}\n`);
 
   // Step 1: Generate RSA keypair
   console.error("Generating RSA key pair...");
