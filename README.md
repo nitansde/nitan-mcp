@@ -213,6 +213,7 @@ Using the published package:
 ```bash
 npx -y @nitansde/mcp@latest generate-user-api-key \
   --site https://www.uscardforum.com \
+  --auth-mode url \
   --save-to /absolute/path/nitan-profile.json
 ```
 
@@ -221,6 +222,21 @@ Using a local checkout after `npm run build`:
 ```bash
 node dist/index.js generate-user-api-key \
   --site https://www.uscardforum.com \
+  --auth-mode url \
+  --save-to /absolute/path/nitan-profile.json
+```
+
+Authorization launch modes:
+
+- `--auth-mode url` (default): print the authorization URL in the terminal and let the user open it manually.
+- `--auth-mode browser`: automatically open the authorization URL in the default browser, while still showing the URL in the terminal as a fallback.
+
+Browser-launch example:
+
+```bash
+npx -y @nitansde/mcp@latest generate-user-api-key \
+  --site https://www.uscardforum.com \
+  --auth-mode browser \
   --save-to /absolute/path/nitan-profile.json
 ```
 
@@ -243,13 +259,13 @@ Example saved profile:
     {
       "site": "https://www.uscardforum.com",
       "user_api_key": "YOUR_USER_API_KEY",
-      "user_api_client_id": "discourse-mcp"
+      "user_api_client_id": "nitan-mcp-550e8400-e29b-41d4-a716-446655440000"
     }
   ]
 }
 ```
 
-If you do not pass `--client-id`, the generator uses `discourse-mcp` by default.
+If you do not pass `--client-id`, the generator creates a unique `nitan-mcp-<uuid>` client ID by default.
 
 #### Use the saved API key in your MCP client
 

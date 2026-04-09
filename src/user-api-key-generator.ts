@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { generateKeyPairSync, privateDecrypt, constants } from "node:crypto";
+import { generateKeyPairSync, privateDecrypt, constants, randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline";
 
@@ -15,8 +16,16 @@ interface GenerateOptions {
   clientId?: string;
   nonce?: string;
   authRedirect?: string;
+  authMode?: AuthLaunchMode;
   payload?: string;
   saveTo?: string;
+}
+
+export type AuthLaunchMode = "url" | "browser";
+
+export interface ParsedGenerateUserApiKeyArgs {
+  options: GenerateOptions;
+  showHelp: boolean;
 }
 
 export function generateKeyPair(): KeyPair {
@@ -35,12 +44,93 @@ export function generateKeyPair(): KeyPair {
   return { publicKey, privateKey };
 }
 
+export function generateClientId(prefix = "nitan-mcp"): string {
+  return `${prefix}-${randomUUID()}`;
+}
+
+export function resolveAuthLaunchMode(mode?: string): AuthLaunchMode {
+  if (!mode || mode === "url") return "url";
+  if (mode === "browser") return "browser";
+  throw new Error(`Invalid --auth-mode value: ${mode}. Expected 'url' or 'browser'.`);
+}
+
+export function parseGenerateUserApiKeyArgs(args: string[]): ParsedGenerateUserApiKeyArgs {
+  const options: GenerateOptions = { site: "" };
+  let showHelp = false;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    const next = args[i + 1];
+
+    switch (arg) {
+      case "--site":
+        options.site = next;
+        i++;
+        break;
+      case "--scopes":
+        options.scopes = next;
+        i++;
+        break;
+      case "--application-name":
+        options.applicationName = next;
+        i++;
+        break;
+      case "--client-id":
+        options.clientId = next;
+        i++;
+        break;
+      case "--nonce":
+        options.nonce = next;
+        i++;
+        break;
+      case "--auth-mode":
+        options.authMode = next as AuthLaunchMode;
+        i++;
+        break;
+      case "--payload":
+        options.payload = next;
+        i++;
+        break;
+      case "--save-to":
+        options.saveTo = next;
+        i++;
+        break;
+      case "--help":
+      case "-h":
+        showHelp = true;
+        break;
+    }
+  }
+
+  return { options, showHelp };
+}
+
+export function getBrowserOpenCommand(url: string, platform = process.platform): { command: string; args: string[] } {
+  if (platform === "darwin") {
+    return { command: "open", args: [url] };
+  }
+  if (platform === "win32") {
+    return { command: "cmd", args: ["/c", "start", "", url] };
+  }
+  return { command: "xdg-open", args: [url] };
+}
+
+export async function openAuthorizationUrl(url: string, platform = process.platform): Promise<void> {
+  const { command, args } = getBrowserOpenCommand(url, platform);
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command, args, { detached: true, stdio: "ignore" });
+    child.on("error", reject);
+    child.unref();
+    resolve();
+  });
+}
+
 export function buildAuthorizationUrl(options: GenerateOptions, publicKey: string): string {
   const url = new URL(`${options.site}/user-api-key/new`);
 
   const params = new URLSearchParams({
     application_name: options.applicationName || "Discourse MCP",
-    client_id: options.clientId || "discourse-mcp",
+    client_id: options.clientId || generateClientId(),
     scopes: options.scopes || "read",
     public_key: publicKey,
     nonce: options.nonce || Date.now().toString(),
@@ -118,15 +208,16 @@ export async function saveToProfile(
 
 export async function generateUserApiKey(options: GenerateOptions): Promise<void> {
   if (!options.site) {
-    console.error(`
+  console.error(`
 Usage: nitan-mcp generate-user-api-key [options]
 
 Options:
   --site <url>              Discourse site URL (required)
   --scopes <scopes>         Comma-separated scopes (default: read)
   --application-name <name> Application name (default: Nitan MCP)
-  --client-id <id>          Client ID (default: nitan-mcp)
+  --client-id <id>          Client ID (default: generated UUID)
   --nonce <nonce>           Nonce for request (default: timestamp)
+  --auth-mode <mode>        How to start authorization: url or browser (default: url)
   --payload <payload>       Encrypted payload (skip interactive prompt)
   --save-to <file>          Save to profile file instead of printing
   --help, -h                Show this help message
@@ -148,25 +239,45 @@ Examples:
   console.error(`Site: ${options.site}`);
   console.error(`Scopes: ${options.scopes || "read"}\n`);
 
+  const clientId = options.clientId || generateClientId();
+  const nonce = options.nonce || Date.now().toString();
+  const authMode = resolveAuthLaunchMode(options.authMode);
+  const resolvedOptions: GenerateOptions = {
+    ...options,
+    clientId,
+    nonce,
+    authMode,
+  };
+
   // Step 1: Generate RSA keypair
   console.error("Generating RSA key pair...");
   const { publicKey, privateKey } = generateKeyPair();
   console.error("✓ Key pair generated\n");
 
   // Step 2: Build authorization URL
-  const authUrl = buildAuthorizationUrl(options, publicKey);
+  const authUrl = buildAuthorizationUrl(resolvedOptions, publicKey);
   console.error("Please visit this URL to authorize the application:\n");
   console.error(authUrl);
   console.error("");
+
+  if (authMode === "browser") {
+    console.error("Opening the authorization URL in your default browser...\n");
+    try {
+      await openAuthorizationUrl(authUrl);
+    } catch (error: any) {
+      console.error(`⚠ Failed to open browser automatically: ${error?.message || String(error)}`);
+      console.error("Please copy the URL above into your browser manually.\n");
+    }
+  } else {
+    console.error("Copy the URL above into your browser to continue.\n");
+  }
 
   // Step 3: Get encrypted payload
   let encryptedPayload: string;
   if (options.payload) {
     encryptedPayload = options.payload;
   } else {
-    console.error("After authorizing, you will be redirected to a URL like:");
-    console.error("  discourse://auth_redirect?payload=<encrypted_payload>");
-    console.error("\nOr you may see the encrypted payload displayed on the page.\n");
+    console.error("After authorizing, copy the encrypted payload shown by Discourse and paste it below.\n");
 
     encryptedPayload = await promptForInput("Paste the encrypted payload here: ");
 
@@ -187,16 +298,14 @@ Examples:
   console.error("✓ User API Key retrieved successfully\n");
 
   // Step 5: Output or save
-  const clientId = options.clientId || "discourse-mcp";
-
-  if (options.saveTo) {
-    await saveToProfile(options.saveTo, options.site, result.key, clientId);
-    console.error(`✓ Saved to profile: ${options.saveTo}\n`);
-    console.log(JSON.stringify({ success: true, profile: options.saveTo }, null, 2));
+  if (resolvedOptions.saveTo) {
+    await saveToProfile(resolvedOptions.saveTo, resolvedOptions.site, result.key, clientId);
+    console.error(`✓ Saved to profile: ${resolvedOptions.saveTo}\n`);
+    console.log(JSON.stringify({ success: true, profile: resolvedOptions.saveTo }, null, 2));
   } else {
     console.error("Add this to your auth_pairs configuration:\n");
     console.log(JSON.stringify({
-      site: options.site,
+      site: resolvedOptions.site,
       user_api_key: result.key,
       user_api_client_id: clientId,
     }, null, 2));
@@ -205,44 +314,7 @@ Examples:
 }
 
 async function main() {
-  const args = process.argv.slice(2);
-  const options: GenerateOptions = { site: "" };
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    const next = args[i + 1];
-
-    switch (arg) {
-      case "--site":
-        options.site = next;
-        i++;
-        break;
-      case "--scopes":
-        options.scopes = next;
-        i++;
-        break;
-      case "--application-name":
-        options.applicationName = next;
-        i++;
-        break;
-      case "--client-id":
-        options.clientId = next;
-        i++;
-        break;
-      case "--nonce":
-        options.nonce = next;
-        i++;
-        break;
-      case "--payload":
-        options.payload = next;
-        i++;
-        break;
-      case "--save-to":
-        options.saveTo = next;
-        i++;
-        break;
-    }
-  }
+  const { options } = parseGenerateUserApiKeyArgs(process.argv.slice(2));
 
   try {
     await generateUserApiKey(options);

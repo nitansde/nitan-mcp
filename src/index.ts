@@ -21,7 +21,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { generateUserApiKey, generateKeyPair, buildAuthorizationUrl, decryptPayload, saveToProfile } from "./user-api-key-generator.js";
+import { generateUserApiKey, parseGenerateUserApiKeyArgs, generateKeyPair, generateClientId, buildAuthorizationUrl, decryptPayload, saveToProfile } from "./user-api-key-generator.js";
 
 // Read package version at runtime to avoid import-attributes incompatibility
 async function getPackageVersion(): Promise<string> {
@@ -457,21 +457,10 @@ async function main() {
     return;
   }
   if (args[0] === "generate-user-api-key") {
-    const options: any = { site: "" };
-    for (let i = 1; i < args.length; i++) {
-      const arg = args[i];
-      const next = args[i + 1];
-      if (arg === "--site") { options.site = next; i++; }
-      else if (arg === "--scopes") { options.scopes = next; i++; }
-      else if (arg === "--application-name") { options.applicationName = next; i++; }
-      else if (arg === "--client-id") { options.clientId = next; i++; }
-      else if (arg === "--nonce") { options.nonce = next; i++; }
-      else if (arg === "--payload") { options.payload = next; i++; }
-      else if (arg === "--save-to") { options.saveTo = next; i++; }
-      else if (arg === "--help" || arg === "-h") {
-        await generateUserApiKey({ site: "" }); // Will show help and exit
-        return;
-      }
+    const { options, showHelp } = parseGenerateUserApiKeyArgs(args.slice(1));
+    if (showHelp) {
+      await generateUserApiKey({ site: "" }); // Will show help and exit
+      return;
     }
     await generateUserApiKey(options);
     return;
@@ -604,7 +593,7 @@ async function main() {
     if (!hasAuth && config.site) {
       const keyPair = generateKeyPair();
       const nonce = Date.now().toString();
-      const clientId = `nitan-mcp-${nonce}`;
+      const clientId = generateClientId();
       pendingAuthKeys = {
         publicKey: keyPair.publicKey,
         privateKey: keyPair.privateKey,
@@ -814,7 +803,7 @@ async function main() {
           }
           const keyPair = generateKeyPair();
           const nonce = Date.now().toString();
-          const clientId = `nitan-mcp-${nonce}`;
+          const clientId = generateClientId();
           // 清除内存中的 auth
           if (config.site) siteState.removeAuthOverride(config.site);
           pendingAuthKeys = { publicKey: keyPair.publicKey, privateKey: keyPair.privateKey, nonce, clientId };

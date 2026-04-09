@@ -193,6 +193,7 @@ test('health adapts to forwarded host and auth page uses manual payload flow', a
     assert.equal(authUrl.origin, 'https://www.uscardforum.com');
     assert.equal(authUrl.pathname, '/user-api-key/new');
     assert.equal(authUrl.searchParams.get('auth_redirect'), null);
+    assert.match(String(authUrl.searchParams.get('client_id')), /^nitan-mcp-[0-9a-f-]{36}$/);
   } finally {
     await stopServer(serverProcess);
     await rm(workdir, { recursive: true, force: true });
@@ -272,6 +273,7 @@ test('POST and GET auth callback process encrypted payloads and update health st
       assert.equal(savedProfile.auth_pairs.length, 1);
       assert.equal(savedProfile.auth_pairs[0].site, 'https://www.uscardforum.com');
       assert.equal(savedProfile.auth_pairs[0].user_api_key, `user-key-${method.toLowerCase()}`);
+      assert.match(String(savedProfile.auth_pairs[0].user_api_client_id), /^nitan-mcp-[0-9a-f-]{36}$/);
     } finally {
       await stopServer(serverProcess);
       await rm(workdir, { recursive: true, force: true });
