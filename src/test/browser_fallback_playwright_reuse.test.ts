@@ -24,6 +24,7 @@ function createFakePlaywrightModule() {
   let launchPersistentContextCalls = 0;
   let newPageCalls = 0;
   let closeCalls = 0;
+  let clearCookiesCalls = 0;
   let fillLoginValue = "";
   let fillPasswordValue = "";
   let clickCalls = 0;
@@ -44,6 +45,7 @@ function createFakePlaywrightModule() {
       return {
         status: () => 200,
         headers: () => ({ "content-type": "text/html" }),
+        text: async () => currentUrl,
       };
     },
     waitForSelector: async () => undefined,
@@ -86,6 +88,9 @@ function createFakePlaywrightModule() {
       closeCalls += 1;
       pageClosed = true;
     },
+    clearCookies: async () => {
+      clearCookiesCalls += 1;
+    },
   };
 
   return {
@@ -107,6 +112,9 @@ function createFakePlaywrightModule() {
       get closeCalls() {
         return closeCalls;
       },
+      get clearCookiesCalls() {
+        return clearCookiesCalls;
+      },
       get fillLoginValue() {
         return fillLoginValue;
       },
@@ -124,6 +132,7 @@ function createSingletonLockThenRecoverPlaywrightModule() {
   let launchPersistentContextCalls = 0;
   let newPageCalls = 0;
   let closeCalls = 0;
+  let clearCookiesCalls = 0;
   let currentUrl = "about:blank";
   let pageClosed = false;
 
@@ -134,6 +143,7 @@ function createSingletonLockThenRecoverPlaywrightModule() {
       return {
         status: () => 200,
         headers: () => ({ "content-type": "text/html" }),
+        text: async () => currentUrl,
       };
     },
     content: async () => `<html><body>${currentUrl}</body></html>`,
@@ -158,6 +168,9 @@ function createSingletonLockThenRecoverPlaywrightModule() {
       closeCalls += 1;
       pageClosed = true;
     },
+    clearCookies: async () => {
+      clearCookiesCalls += 1;
+    },
   };
 
   return {
@@ -181,6 +194,157 @@ function createSingletonLockThenRecoverPlaywrightModule() {
       },
       get closeCalls() {
         return closeCalls;
+      },
+      get clearCookiesCalls() {
+        return clearCookiesCalls;
+      },
+    },
+  };
+}
+
+function createJsonResponsePlaywrightModule() {
+  let launchPersistentContextCalls = 0;
+  let newPageCalls = 0;
+  let closeCalls = 0;
+  let currentUrl = "about:blank";
+  let pageClosed = false;
+
+  const page = {
+    isClosed: () => pageClosed,
+    goto: async (url: string) => {
+      currentUrl = url;
+      return {
+        status: () => 200,
+        headers: () => ({ "content-type": "application/json" }),
+        text: async () => '{"ok":true}',
+      };
+    },
+    content: async () => `<html><body><pre>{"ok":true}</pre></body></html>`,
+    url: () => currentUrl,
+    evaluate: async () => ({
+      status: 200,
+      body: "ok",
+      headers: { "content-type": "text/plain" },
+      finalUrl: currentUrl,
+    }),
+  };
+
+  const pages: Array<typeof page> = [];
+  const context = {
+    pages: () => pages.filter((candidate) => !candidate.isClosed()),
+    newPage: async () => {
+      newPageCalls += 1;
+      pages.push(page);
+      return page;
+    },
+    close: async () => {
+      closeCalls += 1;
+      pageClosed = true;
+    },
+    clearCookies: async () => undefined,
+  };
+
+  return {
+    module: {
+      chromium: {
+        launchPersistentContext: async () => {
+          launchPersistentContextCalls += 1;
+          return context;
+        },
+      },
+    },
+    stats: {
+      get launchPersistentContextCalls() {
+        return launchPersistentContextCalls;
+      },
+      get newPageCalls() {
+        return newPageCalls;
+      },
+      get closeCalls() {
+        return closeCalls;
+      },
+    },
+  };
+}
+
+function createChallengeThenRecoverPlaywrightModule() {
+  let launchPersistentContextCalls = 0;
+  let newPageCalls = 0;
+  let closeCalls = 0;
+  let clearCookiesCalls = 0;
+  let gotoCalls = 0;
+  let currentUrl = "about:blank";
+  let pageClosed = false;
+
+  const page = {
+    isClosed: () => pageClosed,
+    goto: async (url: string) => {
+      gotoCalls += 1;
+      currentUrl = url;
+      if (gotoCalls === 1) {
+        return {
+          status: () => 403,
+          headers: () => ({ "content-type": "text/html" }),
+          text: async () => "<!DOCTYPE html><html><body>Just a moment...</body></html>",
+        };
+      }
+      return {
+        status: () => 200,
+        headers: () => ({ "content-type": "application/json" }),
+        text: async () => '{"recovered":true}',
+      };
+    },
+    content: async () => `<html><body><pre>${gotoCalls > 1 ? '{"recovered":true}' : 'Just a moment...'}</pre></body></html>`,
+    url: () => currentUrl,
+    evaluate: async () => ({
+      status: 200,
+      body: "ok",
+      headers: { "content-type": "text/plain" },
+      finalUrl: currentUrl,
+    }),
+  };
+
+  const pages: Array<typeof page> = [];
+  const context = {
+    pages: () => pages.filter((candidate) => !candidate.isClosed()),
+    newPage: async () => {
+      newPageCalls += 1;
+      pages.push(page);
+      return page;
+    },
+    close: async () => {
+      closeCalls += 1;
+      pageClosed = true;
+    },
+    clearCookies: async () => {
+      clearCookiesCalls += 1;
+    },
+  };
+
+  return {
+    module: {
+      chromium: {
+        launchPersistentContext: async () => {
+          launchPersistentContextCalls += 1;
+          return context;
+        },
+      },
+    },
+    stats: {
+      get launchPersistentContextCalls() {
+        return launchPersistentContextCalls;
+      },
+      get newPageCalls() {
+        return newPageCalls;
+      },
+      get closeCalls() {
+        return closeCalls;
+      },
+      get clearCookiesCalls() {
+        return clearCookiesCalls;
+      },
+      get gotoCalls() {
+        return gotoCalls;
       },
     },
   };
@@ -215,6 +379,66 @@ test("reuses single Playwright context and tab across repeated fallback GET requ
 
     await client.dispose();
     assert.equal(fakePlaywright.stats.closeCalls, 1);
+  } finally {
+    await client.dispose();
+    process.env.HOME = originalHome;
+    restorePlatform();
+    rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("uses raw response text for GET JSON endpoints instead of rendered page HTML", async () => {
+  const restorePlatform = overridePlatform("darwin");
+  const originalHome = process.env.HOME;
+  const homeDir = mkdtempSync(join(tmpdir(), "nitan-playwright-json-body-"));
+  process.env.HOME = homeDir;
+
+  const fakePlaywright = createJsonResponsePlaywrightModule();
+  const client = new BrowserFallbackClient(new Logger("silent"), {
+    enabled: true,
+    provider: "playwright",
+    loginProfileName: "Default",
+    playwrightModuleLoader: async () => fakePlaywright.module,
+  });
+
+  try {
+    const nitanProfileDir = join(homeDir, "Library", "Application Support", "NitanMCP", "ChromeProfile", "Default");
+    mkdirSync(nitanProfileDir, { recursive: true });
+
+    const response = await client.request({ url: "https://example.com/about.json", method: "GET" });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body, '{"ok":true}');
+    assert.equal(fakePlaywright.stats.launchPersistentContextCalls, 1);
+    assert.equal(fakePlaywright.stats.newPageCalls, 1);
+  } finally {
+    await client.dispose();
+    process.env.HOME = originalHome;
+    restorePlatform();
+    rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("retries implicit managed nitan profile GET once after clearing cookies on challenge response", async () => {
+  const restorePlatform = overridePlatform("darwin");
+  const originalHome = process.env.HOME;
+  const homeDir = mkdtempSync(join(tmpdir(), "nitan-playwright-cookie-recovery-"));
+  process.env.HOME = homeDir;
+
+  const fakePlaywright = createChallengeThenRecoverPlaywrightModule();
+  const client = new BrowserFallbackClient(new Logger("silent"), {
+    enabled: true,
+    provider: "playwright",
+    playwrightModuleLoader: async () => fakePlaywright.module,
+  });
+
+  try {
+    const response = await client.request({ url: "https://example.com/about.json", method: "GET" });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body, '{"recovered":true}');
+    assert.equal(fakePlaywright.stats.clearCookiesCalls, 1);
+    assert.equal(fakePlaywright.stats.gotoCalls, 2);
   } finally {
     await client.dispose();
     process.env.HOME = originalHome;

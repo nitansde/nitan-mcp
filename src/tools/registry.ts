@@ -19,6 +19,7 @@ import { registerListNotifications } from "./builtin/list_notifications.js";
 import { registerListTopTopics } from "./builtin/list_top_topics.js";
 import { registerListExcellentTopics } from "./builtin/list_excellent_topics.js";
 import { registerListFunnyTopics } from "./builtin/list_funny_topics.js";
+import { registerGetTrustLevelProgress } from "./builtin/get_trust_level_progress.js";
 
 export type ToolsMode = "auto" | "discourse_api_only" | "tool_exec_api";
 
@@ -82,21 +83,22 @@ export async function registerAllTools(
   if (!opts.hideSelectSite) {
     registerSelectSite(aliasedServer, ctx, { allowWrites: false, toolsMode: opts.toolsMode });
   }
-  registerSearch(aliasedServer, ctx, { allowWrites: false });
-  registerReadTopic(aliasedServer, ctx, { allowWrites: false });
-  // registerReadPost(aliasedServer, ctx, { allowWrites: false });
-  // registerListCategories(aliasedServer, ctx, { allowWrites: false }); // Disabled - categories don't change
-  // registerListTags(aliasedServer, ctx, { allowWrites: false });
-  // registerGetUser(aliasedServer, ctx, { allowWrites: false });
-  registerListUserPosts(aliasedServer, ctx, { allowWrites: false });
-  registerListHotTopics(aliasedServer, ctx, { allowWrites: false });
-  registerListNotifications(aliasedServer, ctx, { allowWrites: false });
-  registerListTopTopics(aliasedServer, ctx, { allowWrites: false });
-  registerListExcellentTopics(aliasedServer, ctx, { allowWrites: false });
-  registerListFunnyTopics(aliasedServer, ctx, { allowWrites: false });
-  // registerFilterTopics(aliasedServer, ctx, { allowWrites: false });
-  registerCreatePost(aliasedServer, ctx, { allowWrites: opts.allowWrites });
-  registerCreateUser(aliasedServer, ctx, { allowWrites: opts.allowWrites });
-  registerCreateCategory(aliasedServer, ctx, { allowWrites: opts.allowWrites });
-  registerCreateTopic(aliasedServer, ctx, { allowWrites: opts.allowWrites });
+  registerSearch(server, ctx, { allowWrites: false });
+  registerReadTopic(server, ctx, { allowWrites: false });
+  // registerReadPost(server, ctx, { allowWrites: false });
+  // registerListCategories(server, ctx, { allowWrites: false }); // Disabled - categories don't change
+  // registerListTags(server, ctx, { allowWrites: false });
+  // registerGetUser(server, ctx, { allowWrites: false });
+  registerListUserPosts(server, ctx, { allowWrites: false });
+  registerListHotTopics(server, ctx, { allowWrites: false });
+  registerListNotifications(server, ctx, { allowWrites: false });
+  registerListTopTopics(server, ctx, { allowWrites: false });
+  registerListExcellentTopics(server, ctx, { allowWrites: false });
+  registerListFunnyTopics(server, ctx, { allowWrites: false });
+  // registerFilterTopics(server, ctx, { allowWrites: false });
+  registerCreatePost(server, ctx, { allowWrites: opts.allowWrites });
+  registerCreateUser(server, ctx, { allowWrites: opts.allowWrites });
+  registerCreateCategory(server, ctx, { allowWrites: opts.allowWrites });
+  registerCreateTopic(server, ctx, { allowWrites: opts.allowWrites });
+  registerGetTrustLevelProgress(server, ctx, { allowWrites: false });
 }
