@@ -14,6 +14,7 @@ interface GenerateOptions {
   applicationName?: string;
   clientId?: string;
   nonce?: string;
+  authRedirect?: string;
   payload?: string;
   saveTo?: string;
 }
@@ -44,6 +45,10 @@ export function buildAuthorizationUrl(options: GenerateOptions, publicKey: strin
     public_key: publicKey,
     nonce: options.nonce || Date.now().toString(),
   });
+
+  if (options.authRedirect) {
+    params.set("auth_redirect", options.authRedirect);
+  }
 
   url.search = params.toString();
   return url.toString();

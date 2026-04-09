@@ -86,6 +86,11 @@ export class SiteState {
     return { base, client };
   }
 
+  hasAuthForSite(siteUrl: string): boolean {
+    const base = normalizeBase(siteUrl);
+    return this.resolveAuthForSite(base).type !== "none";
+  }
+
   // 热更新 auth — 替换或追加指定 site 的认证信息，并清除缓存的 client
   updateAuthOverride(override: AuthOverride): void {
     if (!this.opts.authOverrides) this.opts.authOverrides = [];

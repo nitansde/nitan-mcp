@@ -13,7 +13,6 @@ if (majorVersion < 18) {
 }
 
 import { readFile, writeFile } from "node:fs/promises";
-import crypto from "node:crypto";
 import { existsSync } from "node:fs";
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
@@ -86,7 +85,7 @@ const ProfileSchema = z
       .default(50000)
       .describe("Maximum number of characters to include when returning post content (set via --max-read-length)"),
     transport: z.enum(["stdio", "http"]).optional().default("stdio").describe("Transport type: stdio (default) or http"),
-    port: z.number().int().positive().optional().default(3001).describe("Port to listen on when using HTTP transport"),
+    port: z.number().int().positive().optional().default(3000).describe("Port to listen on when using HTTP transport"),
     use_cloudscraper: z.boolean().optional().describe("(Deprecated: use bypass_method instead) Use Python cloudscraper to bypass Cloudflare"),
     bypass_method: z.enum(["cloudscraper", "curl_cffi", "both"]).optional().default("both").describe("Cloudflare bypass method: 'cloudscraper', 'curl_cffi', or 'both' (default - tries cloudscraper with curl_cffi fallback)"),
     python_path: z.string().optional().default(getDefaultPythonPath()).describe("Path to Python executable for bypass methods (defaults to local .venv python when available)"),
@@ -590,7 +589,7 @@ async function main() {
   if (config.transport === "http") {
     // HTTP transport using Streamable HTTP
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => crypto.randomUUID(),
+      sessionIdGenerator: undefined,
       enableJsonResponse: true,
     });
 
@@ -601,7 +600,7 @@ async function main() {
     // Auth state for unauthenticated servers — generate keypair at startup,
     // auth URL is built per-request using the Host header so the callback
     // automatically matches however the client reached us (Funnel, Tailscale DNS, localhost).
-    const hasAuth = Array.isArray(config.auth_pairs) && config.auth_pairs.length > 0;
+    const hasAuth = Boolean(config.site && siteState.hasAuthForSite(config.site));
     let pendingAuthKeys: {
       publicKey: string;
       privateKey: string;
@@ -632,8 +631,7 @@ async function main() {
       return `http://localhost:${config.port}`;
     }
 
-    /** Build the auth URL (no auth_redirect — Discourse will show the payload on-page). */
-    function buildPendingAuthUrl(): string | null {
+    function buildPendingAuthUrl(req: import("node:http").IncomingMessage): string | null {
       if (!pendingAuthKeys || !config.site) return null;
       return buildAuthorizationUrl(
         {
@@ -642,6 +640,7 @@ async function main() {
           clientId: pendingAuthKeys.clientId,
           nonce: pendingAuthKeys.nonce,
           scopes: "read,write",
+          authRedirect: `${getCallbackBaseUrl(req)}/auth/callback`,
         },
         pendingAuthKeys.publicKey
       );
@@ -668,7 +667,7 @@ async function main() {
 
       // Auth page endpoint
       if (req.method === "GET" && parsedUrl.pathname === "/auth") {
-        const authUrl = buildPendingAuthUrl();
+        const authUrl = buildPendingAuthUrl(req);
         const isAuthenticated = !pendingAuthKeys;
         const html = `
 <!DOCTYPE html>
