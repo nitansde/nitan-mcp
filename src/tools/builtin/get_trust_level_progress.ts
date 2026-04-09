@@ -56,15 +56,28 @@ export const registerGetTrustLevelProgress: RegisterFn = (server, ctx) => {
     async ({ username }) => {
       try {
         const { client } = ctx.siteState.ensureSelectedSite();
-        const normalizedUsername = username.toLowerCase();
-
         const summaryData = await (client.get(`/u/${encodeURIComponent(username)}/summary.json`) as Promise<any>);
+        const summaryStats: Record<string, unknown> = summaryData?.user_summary || {};
+        const summaryTrustLevel: number = summaryData?.users?.[0]?.trust_level ?? 0;
+
+        if (summaryTrustLevel >= 4) {
+          return {
+            content: [{
+              type: "text",
+              text: [
+                `User: @${username}`,
+                `Current Trust Level: ${summaryTrustLevel} (${TRUST_LEVEL_LABELS[4]})`,
+                "",
+                "Highest trust level reached. No further automatic progress applies.",
+              ].join("\n"),
+            }],
+          };
+        }
+
+        const normalizedUsername = username.toLowerCase();
         const dirData = await (client.get(
           `/directory_items.json?period=quarterly&order=days_visited&name=${encodeURIComponent(username)}`
         ) as Promise<any>);
-
-        const summaryStats: Record<string, unknown> = summaryData?.user_summary || {};
-        const summaryTrustLevel: number = summaryData?.users?.[0]?.trust_level ?? 0;
 
         const dirItems: any[] = dirData?.directory_items || [];
         const dirItem = dirItems.find((item: any) => item?.user?.username?.toLowerCase?.() === normalizedUsername);

@@ -55,6 +55,33 @@ function expectedRegisteredToolNames(hideSelectSite = false) {
   return hideSelectSite ? names : ['discourse_select_site', '美卡_选站', ...names];
 }
 
+test('site state prefers API auth over login credentials when both are configured', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({
+    logger,
+    timeoutMs: 5000,
+    defaultAuth: { type: 'none' },
+    authOverrides: [{
+      site: 'https://example.com',
+      user_api_key: 'demo-key',
+      user_api_client_id: 'demo-client',
+      username: 'demo-user',
+      password: 'demo-pass',
+    }],
+  });
+
+  try {
+    const { client } = siteState.buildClientForSite('https://example.com');
+    assert.deepEqual((client as any).opts.auth, { type: 'user_api_key', key: 'demo-key', client_id: 'demo-client' });
+    assert.equal((client as any).opts.loginCredentials, undefined);
+    assert.equal(siteState.hasAuthForSite('https://example.com'), true);
+    assert.equal(siteState.hasLoginForSite('https://example.com'), true);
+    assert.equal(siteState.hasAuthenticationConfiguredForSite('https://example.com'), true);
+  } finally {
+    await siteState.dispose();
+  }
+});
+
 test('built-in tool set contains only read operations', async () => {
   const logger = new Logger('silent');
   const siteState = createSiteState();
@@ -187,6 +214,9 @@ test('notifications tool reports Cloudflare challenge instead of not logged in',
           },
         },
       };
+    },
+    hasAuthenticationConfiguredForSite() {
+      return true;
     },
   };
 
@@ -392,8 +422,10 @@ test('trust-level tool shows TL4 as highest level instead of TL3 retention', asy
   const fakeServer: any = { registerTool(name: string, _meta: any, handler: Function) { tools[name] = { handler }; } };
 
   const originalFetch = globalThis.fetch;
+  const requestedUrls: string[] = [];
   globalThis.fetch = (async (input: any) => {
     const url = typeof input === 'string' ? input : input.toString();
+    requestedUrls.push(url);
 
     if (url.endsWith('/about.json')) {
       return new Response(JSON.stringify({ about: { title: 'Example Discourse', stats: { posts_30_days: 1200, topics_30_days: 120 } } }), {
@@ -434,7 +466,44 @@ test('trust-level tool shows TL4 as highest level instead of TL3 retention', asy
     assert.match(text, /Current Trust Level: 4 \(Leader\)/);
     assert.match(text, /Highest trust level reached/);
     assert.doesNotMatch(text, /Progress toward TL3/);
+    assert.deepEqual(requestedUrls, [
+      'https://example.com/about.json',
+      'https://example.com/u/leader/summary.json',
+    ]);
   } finally {
     globalThis.fetch = originalFetch as any;
   }
+});
+
+test('notifications tool prompts auth setup when neither API key nor login credentials are configured', async () => {
+  const logger = new Logger('silent');
+  const fakeServerTools: Record<string, { handler: Function }> = {};
+  const fakeServer: any = {
+    registerTool(name: string, _meta: any, handler: Function) {
+      fakeServerTools[name] = { handler };
+    },
+  };
+  const fakeSiteState: any = {
+    ensureSelectedSite() {
+      return {
+        base: 'https://www.uscardforum.com',
+        client: {
+          async get() {
+            throw new Error('should not request network without auth config');
+          },
+        },
+      };
+    },
+    hasAuthenticationConfiguredForSite() {
+      return false;
+    },
+  };
+
+  registerListNotifications(fakeServer, { siteState: fakeSiteState, maxReadLength: 50000 } as any, { toolsMode: 'discourse_api_only' });
+
+  const result = await fakeServerTools['discourse_list_notifications'].handler({ limit: 5, unread_only: false }, {});
+  const text = String(result?.content?.[0]?.text || '');
+
+  assert.equal(result?.isError, true);
+  assert.match(text, /Set up an API key or provide NITAN_USERNAME\/NITAN_PASSWORD/);
 });

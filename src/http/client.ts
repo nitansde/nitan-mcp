@@ -331,7 +331,11 @@ export class HttpClient {
     this.opts.logger.info(`Attempting browser fallback for ${method} ${url}`);
     let response = await this.browserFallbackClient.request(browserRequest);
 
-    if (this.isLoginRequired(response.finalUrl, response.body)) {
+      if (this.isLoginRequired(response.finalUrl, response.body)) {
+        if (!this.opts.loginCredentials) {
+        throw new Error("Authentication required. Configure an API key or provide NITAN_USERNAME/NITAN_PASSWORD.");
+        }
+
       const autoLoginAttempted = await this.browserFallbackClient.maybeAutoLogin(this.base.toString());
       if (autoLoginAttempted) {
         this.opts.logger.info(`Retrying browser fallback once after auto-login for ${method} ${url}`);

@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 import { HttpClient } from "../http/client.js";
 import { Logger } from "../util/logger.js";
 
-function createHttpClientForFallbackTests(): HttpClient {
+function createHttpClientForFallbackTests(options?: { loginCredentials?: { username: string; password: string; second_factor_token?: string } }): HttpClient {
   return new HttpClient({
     baseUrl: "https://www.uscardforum.com",
     timeoutMs: 5_000,
     logger: new Logger("silent"),
     auth: { type: "none" },
+    loginCredentials: options?.loginCredentials,
     bypassMethod: "both",
     browserFallback: {
       enabled: true,
@@ -19,7 +20,7 @@ function createHttpClientForFallbackTests(): HttpClient {
 }
 
 test("browser fallback retries once after auto-login attempt", async () => {
-  const client = createHttpClientForFallbackTests();
+  const client = createHttpClientForFallbackTests({ loginCredentials: { username: 'demo-user', password: 'demo-password' } });
 
   let requestCalls = 0;
   let autoLoginCalls = 0;
@@ -63,7 +64,7 @@ test("browser fallback retries once after auto-login attempt", async () => {
 });
 
 test("browser fallback keeps interactive flow when auto-login env is missing", async () => {
-  const client = createHttpClientForFallbackTests();
+  const client = createHttpClientForFallbackTests({ loginCredentials: { username: 'demo-user', password: 'demo-password' } });
 
   let requestCalls = 0;
   let autoLoginCalls = 0;
@@ -102,7 +103,7 @@ test("browser fallback keeps interactive flow when auto-login env is missing", a
 });
 
 test("browser fallback prompts interactive login when retry still lands on login page", async () => {
-  const client = createHttpClientForFallbackTests();
+  const client = createHttpClientForFallbackTests({ loginCredentials: { username: 'demo-user', password: 'demo-password' } });
 
   let requestCalls = 0;
   let autoLoginCalls = 0;

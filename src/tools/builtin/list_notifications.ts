@@ -60,12 +60,23 @@ export const registerListNotifications: RegisterFn = (server, ctx) => {
     "discourse_list_notifications",
     {
       title: "List Notifications",
-      description: "Get user notifications from the forum. Requires authentication with user credentials.",
+      description: "Get user notifications from the forum. Requires either a User API key or configured login credentials.",
       inputSchema: schema.shape,
     },
     async ({ limit = 30, unread_only = true }, _extra: any) => {
       try {
         const { base, client } = ctx.siteState.ensureSelectedSite();
+        if (!ctx.siteState.hasAuthenticationConfiguredForSite(base)) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: "Unable to fetch notifications: authentication is required. Set up an API key or provide NITAN_USERNAME/NITAN_PASSWORD.",
+              },
+            ],
+            isError: true,
+          };
+        }
         const maxReadLength = Number.isFinite(ctx.maxReadLength) ? ctx.maxReadLength : 50000;
         
         // Fetch notifications from the API
@@ -182,7 +193,7 @@ export const registerListNotifications: RegisterFn = (server, ctx) => {
             content: [
               {
                 type: "text",
-                text: "Unable to fetch notifications: User is not logged in. Notifications require authentication with username and password.",
+                text: "Unable to fetch notifications: authentication failed. Set up an API key or provide NITAN_USERNAME/NITAN_PASSWORD.",
               },
             ],
             isError: true,

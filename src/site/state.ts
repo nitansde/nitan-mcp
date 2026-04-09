@@ -56,7 +56,7 @@ export class SiteState {
     if (cached) return { base, client: cached };
 
     const auth = this.resolveAuthForSite(base);
-    const loginCreds = this.resolveLoginForSite(base);
+    const loginCreds = auth.type === "none" ? this.resolveLoginForSite(base) : undefined;
     
     // Determine bypass method (support legacy useCloudscraper option)
     let bypassMethod: BypassMethod | undefined = this.opts.bypassMethod;
@@ -89,6 +89,15 @@ export class SiteState {
   hasAuthForSite(siteUrl: string): boolean {
     const base = normalizeBase(siteUrl);
     return this.resolveAuthForSite(base).type !== "none";
+  }
+
+  hasLoginForSite(siteUrl: string): boolean {
+    const base = normalizeBase(siteUrl);
+    return Boolean(this.resolveLoginForSite(base));
+  }
+
+  hasAuthenticationConfiguredForSite(siteUrl: string): boolean {
+    return this.hasAuthForSite(siteUrl) || this.hasLoginForSite(siteUrl);
   }
 
   // 热更新 auth — 替换或追加指定 site 的认证信息，并清除缓存的 client
