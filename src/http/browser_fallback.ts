@@ -658,13 +658,14 @@ export class BrowserFallbackClient {
   }
 
   private async requestViaPlaywrightPage(page: any, input: BrowserRequest): Promise<BrowserResponse> {
-    const response = await page.goto(input.url, { waitUntil: "domcontentloaded", timeout: this.timeoutMs });
-    const content = await this.readPlaywrightGetBody(response, page);
-    const status = response?.status() ?? 0;
-    const headers = response?.headers?.() ?? {};
-    const finalUrl = page.url();
+    const hasCustomHeaders = Boolean(input.headers && Object.keys(input.headers).length > 0);
+    if (input.method.toUpperCase() !== "GET" || hasCustomHeaders) {
+      const targetOrigin = new URL(input.url).origin;
+      const currentUrl = typeof page.url === "function" ? page.url() : "about:blank";
+      if (!currentUrl || currentUrl === "about:blank" || !currentUrl.startsWith(targetOrigin)) {
+        await page.goto(targetOrigin, { waitUntil: "domcontentloaded", timeout: this.timeoutMs });
+      }
 
-    if (input.method.toUpperCase() !== "GET") {
       const payload = await page.evaluate(async (req: any) => {
         const fetchResp = await fetch(req.url, {
           method: req.method,
@@ -691,6 +692,12 @@ export class BrowserFallbackClient {
       });
       return payload;
     }
+
+    const response = await page.goto(input.url, { waitUntil: "domcontentloaded", timeout: this.timeoutMs });
+    const content = await this.readPlaywrightGetBody(response, page);
+    const status = response?.status() ?? 0;
+    const headers = response?.headers?.() ?? {};
+    const finalUrl = page.url();
 
     return {
       status,

@@ -139,3 +139,45 @@ test("browser fallback prompts interactive login when retry still lands on login
   assert.equal(interactiveCalls, 1);
   await client.dispose();
 });
+
+test("native fetch challenge escalates to browser fallback", async () => {
+  const client = createHttpClientForFallbackTests();
+  const originalFetch = globalThis.fetch;
+
+  (client as any).cloudscraperClient = undefined;
+  (client as any).curlCffiClient = undefined;
+
+  let browserFallbackCalls = 0;
+  (client as any).browserFallbackClient = {
+    isEnabled: () => true,
+    request: async () => {
+      browserFallbackCalls += 1;
+      return {
+        status: 200,
+        body: "{\"ok\":true}",
+        headers: { "content-type": "application/json" },
+        finalUrl: "https://www.uscardforum.com/notifications.json",
+      };
+    },
+    maybeAutoLogin: async () => false,
+    maybePromptInteractiveLogin: async () => undefined,
+  };
+
+  globalThis.fetch = (async () => new Response("<!DOCTYPE html><html><body>Just a moment...</body></html>", {
+    status: 403,
+    headers: {
+      "content-type": "text/html; charset=UTF-8",
+      "cf-mitigated": "challenge",
+      server: "cloudflare",
+    },
+  })) as any;
+
+  try {
+    const result = await client.get("/notifications.json?limit=5");
+    assert.deepEqual(result, { ok: true });
+    assert.equal(browserFallbackCalls, 1);
+  } finally {
+    globalThis.fetch = originalFetch as any;
+    await client.dispose();
+  }
+});

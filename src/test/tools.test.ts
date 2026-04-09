@@ -4,6 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Logger } from '../util/logger.js';
 import { registerAllTools } from '../tools/registry.js';
 import { SiteState } from '../site/state.js';
+import { registerListNotifications } from '../tools/builtin/list_notifications.js';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -152,4 +153,39 @@ test('default-search prefix is applied to queries', async () => {
   } finally {
     globalThis.fetch = originalFetch as any;
   }
+});
+
+test('notifications tool reports Cloudflare challenge instead of not logged in', async () => {
+  const logger = new Logger('silent');
+  const fakeServerTools: Record<string, { handler: Function }> = {};
+  const fakeServer: any = {
+    registerTool(name: string, _meta: any, handler: Function) {
+      fakeServerTools[name] = { handler };
+    },
+  };
+  const fakeSiteState: any = {
+    ensureSelectedSite() {
+      return {
+        base: 'https://www.uscardforum.com',
+        client: {
+          async get() {
+            throw {
+              status: 403,
+              message: 'HTTP 403 Forbidden',
+              body: '<!DOCTYPE html><html><head><title>Just a moment...</title></head><body>Cloudflare challenge</body></html>',
+            };
+          },
+        },
+      };
+    },
+  };
+
+  registerListNotifications(fakeServer, { siteState: fakeSiteState, maxReadLength: 50000 } as any, { toolsMode: 'discourse_api_only' });
+
+  const result = await fakeServerTools['discourse_list_notifications'].handler({ limit: 5, unread_only: false }, {});
+  const text = String(result?.content?.[0]?.text || '');
+
+  assert.equal(result?.isError, true);
+  assert.match(text, /Cloudflare challenge blocked the request/);
+  assert.doesNotMatch(text, /User is not logged in/);
 });
