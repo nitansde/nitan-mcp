@@ -571,7 +571,6 @@ test("uses browser fetch for GET requests that need custom auth headers", async 
     rmSync(homeDir, { recursive: true, force: true });
   }
 });
-
 test("auto-login is attempted with NITAN env credentials and skipped when env is missing", async () => {
   const restorePlatform = overridePlatform("darwin");
   const originalHome = process.env.HOME;
