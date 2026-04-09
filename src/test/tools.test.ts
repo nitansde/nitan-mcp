@@ -25,18 +25,32 @@ test('registers built-in tools', async () => {
   const logger = new Logger('silent');
   const siteState = createSiteState();
   const server = new McpServer({ name: 'test', version: '0.0.0' }, { capabilities: { tools: { listChanged: false } } });
-  await registerAllTools(server as any, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' });
+  await registerAllTools(server as any, siteState, logger, { toolsMode: 'discourse_api_only' });
   assert.ok(true);
 });
 
-test('registers write-enabled tools when allowWrites=true', async () => {
+function expectedRegisteredToolNames(hideSelectSite = false) {
+  const names = [
+    'discourse_search',
+    'discourse_read_topic',
+    'discourse_get_user_activity',
+    'discourse_list_hot_topics',
+    'discourse_list_notifications',
+    'discourse_list_top_topics',
+    'discourse_list_excellent_topics',
+    'discourse_list_funny_topics',
+  ];
+
+  return hideSelectSite ? names : ['discourse_select_site', ...names];
+}
+
+test('built-in tool set contains only read operations', async () => {
   const logger = new Logger('silent');
   const siteState = createSiteState();
   const tools: Record<string, { handler: Function }> = {};
   const fakeServer: any = { registerTool(name: string, _meta: any, handler: Function) { tools[name] = { handler }; } };
-  await registerAllTools(fakeServer, siteState, logger, { allowWrites: true, toolsMode: 'discourse_api_only' } as any);
-  assert.ok('discourse_create_post' in tools);
-  assert.ok('discourse_create_category' in tools);
+  await registerAllTools(fakeServer, siteState, logger, { toolsMode: 'discourse_api_only' } as any);
+  assert.deepEqual(Object.keys(tools).sort(), expectedRegisteredToolNames(false).sort());
 });
 
 async function readFixture(name: string) {
@@ -59,7 +73,7 @@ test('select-site then search flow works with mocked HTTP', async () => {
   const siteState = createSiteState();
   const tools: Record<string, { handler: Function }> = {};
   const fakeServer: any = { registerTool(name: string, _meta: any, handler: Function) { tools[name] = { handler }; } };
-  await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' });
+    await registerAllTools(fakeServer, siteState, logger, { toolsMode: 'discourse_api_only' });
 
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async (input: any) => {
@@ -98,7 +112,7 @@ test('tethered mode hides select_site and allows search without selection', asyn
     const { base, client } = siteState.buildClientForSite('https://example.com');
     await client.get('/about.json');
     siteState.selectSite(base);
-    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', hideSelectSite: true } as any);
+    await registerAllTools(fakeServer, siteState, logger, { toolsMode: 'discourse_api_only', hideSelectSite: true } as any);
     assert.ok(!('discourse_select_site' in tools));
     const searchRes = await tools['discourse_search'].handler({ query: 'hello' }, {});
     const text = String(searchRes?.content?.[0]?.text || '');
@@ -128,7 +142,7 @@ test('default-search prefix is applied to queries', async () => {
     const { base, client } = siteState.buildClientForSite('https://example.com');
     await client.get('/about.json');
     siteState.selectSite(base);
-    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', defaultSearchPrefix: 'tag:ai order:latest-post' } as any);
+    await registerAllTools(fakeServer, siteState, logger, { toolsMode: 'discourse_api_only', defaultSearchPrefix: 'tag:ai order:latest-post' } as any);
     await tools['discourse_search'].handler({ query: 'hello world' }, {});
     assert.ok(lastUrl && lastUrl.includes('/search.json?'));
     const qs = lastUrl!.split('?')[1] || '';

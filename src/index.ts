@@ -68,8 +68,6 @@ const ProfileSchema = z
           .strict()
       )
       .optional(),
-    read_only: z.boolean().optional().default(true),
-    allow_writes: z.boolean().optional().default(false),
     timeout_ms: z.number().int().positive().optional().default(DEFAULT_TIMEOUT_MS),
     concurrency: z.number().int().positive().optional().default(4),
     cache_dir: z.string().optional(),
@@ -209,8 +207,6 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
   
   const merged = {
     auth_pairs: authPairs,
-    read_only: ((flags.read_only ?? flags["read-only"]) as boolean | undefined) ?? profile.read_only ?? true,
-    allow_writes: ((flags.allow_writes ?? flags["allow-writes"]) as boolean | undefined) ?? profile.allow_writes ?? false,
     timeout_ms: ((flags.timeout_ms ?? flags["timeout-ms"]) as number | undefined) ?? profile.timeout_ms ?? DEFAULT_TIMEOUT_MS,
     concurrency: (flags.concurrency as number | undefined) ?? profile.concurrency ?? 4,
     cache_dir: ((flags.cache_dir ?? flags["cache-dir"]) as string | undefined) ?? profile.cache_dir,
@@ -547,8 +543,6 @@ async function main() {
     }
   );
 
-  const allowWrites = Boolean(config.allow_writes && !config.read_only && (config.auth_pairs && config.auth_pairs.length > 0));
-
   // If tethered to a site, validate and preselect it before registering tools,
   // and trigger remote tool discovery when enabled.
   let hideSelectSite = false;
@@ -572,7 +566,6 @@ async function main() {
   }
 
   await registerAllTools(server as any, siteState, logger, {
-    allowWrites,
     toolsMode: config.tools_mode,
     hideSelectSite,
     defaultSearchPrefix: config.default_search,
@@ -639,7 +632,7 @@ async function main() {
           applicationName: "Nitan MCP",
           clientId: pendingAuthKeys.clientId,
           nonce: pendingAuthKeys.nonce,
-          scopes: "read,write",
+          scopes: "read",
           authRedirect: `${getCallbackBaseUrl(req)}/auth/callback`,
         },
         pendingAuthKeys.publicKey

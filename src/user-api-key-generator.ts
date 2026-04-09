@@ -41,7 +41,7 @@ export function buildAuthorizationUrl(options: GenerateOptions, publicKey: strin
   const params = new URLSearchParams({
     application_name: options.applicationName || "Discourse MCP",
     client_id: options.clientId || "discourse-mcp",
-    scopes: options.scopes || "read,write",
+    scopes: options.scopes || "read",
     public_key: publicKey,
     nonce: options.nonce || Date.now().toString(),
   });
@@ -123,7 +123,7 @@ Usage: nitan-mcp generate-user-api-key [options]
 
 Options:
   --site <url>              Discourse site URL (required)
-  --scopes <scopes>         Comma-separated scopes (default: read,write)
+  --scopes <scopes>         Comma-separated scopes (default: read)
   --application-name <name> Application name (default: Nitan MCP)
   --client-id <id>          Client ID (default: nitan-mcp)
   --nonce <nonce>           Nonce for request (default: timestamp)
@@ -146,7 +146,7 @@ Examples:
 
   console.error("\n🔑 Discourse User API Key Generator\n");
   console.error(`Site: ${options.site}`);
-  console.error(`Scopes: ${options.scopes || "read,write"}\n`);
+  console.error(`Scopes: ${options.scopes || "read"}\n`);
 
   // Step 1: Generate RSA keypair
   console.error("Generating RSA key pair...");

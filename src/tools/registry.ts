@@ -7,12 +7,8 @@ import { registerReadPost } from "./builtin/read_post.js";
 import { registerListCategories } from "./builtin/list_categories.js";
 import { registerListTags } from "./builtin/list_tags.js";
 import { registerGetUser } from "./builtin/get_user.js";
-import { registerCreatePost } from "./builtin/create_post.js";
-import { registerCreateCategory } from "./builtin/create_category.js";
-import { registerCreateTopic } from "./builtin/create_topic.js";
 import { registerSelectSite } from "./builtin/select_site.js";
 import { registerFilterTopics } from "./builtin/filter_topics.js";
-import { registerCreateUser } from "./builtin/create_user.js";
 import { registerListUserPosts } from "./builtin/list_user_posts.js";
 import { registerListHotTopics } from "./builtin/list_hot_topics.js";
 import { registerListNotifications } from "./builtin/list_notifications.js";
@@ -23,7 +19,6 @@ import { registerListFunnyTopics } from "./builtin/list_funny_topics.js";
 export type ToolsMode = "auto" | "discourse_api_only" | "tool_exec_api";
 
 export interface RegistryOptions {
-  allowWrites: boolean;
   toolsMode: ToolsMode;
   // When true, do not register the discourse_select_site tool
   hideSelectSite?: boolean;
@@ -41,23 +36,19 @@ export async function registerAllTools(
 
   // Built-in tools
   if (!opts.hideSelectSite) {
-    registerSelectSite(server, ctx, { allowWrites: false, toolsMode: opts.toolsMode });
+    registerSelectSite(server, ctx, { toolsMode: opts.toolsMode });
   }
-  registerSearch(server, ctx, { allowWrites: false });
-  registerReadTopic(server, ctx, { allowWrites: false });
-  // registerReadPost(server, ctx, { allowWrites: false });
-  // registerListCategories(server, ctx, { allowWrites: false }); // Disabled - categories don't change
-  // registerListTags(server, ctx, { allowWrites: false });
-  // registerGetUser(server, ctx, { allowWrites: false });
-  registerListUserPosts(server, ctx, { allowWrites: false });
-  registerListHotTopics(server, ctx, { allowWrites: false });
-  registerListNotifications(server, ctx, { allowWrites: false });
-  registerListTopTopics(server, ctx, { allowWrites: false });
-  registerListExcellentTopics(server, ctx, { allowWrites: false });
-  registerListFunnyTopics(server, ctx, { allowWrites: false });
-  // registerFilterTopics(server, ctx, { allowWrites: false });
-  registerCreatePost(server, ctx, { allowWrites: opts.allowWrites });
-  registerCreateUser(server, ctx, { allowWrites: opts.allowWrites });
-  registerCreateCategory(server, ctx, { allowWrites: opts.allowWrites });
-  registerCreateTopic(server, ctx, { allowWrites: opts.allowWrites });
+  registerSearch(server, ctx, {});
+  registerReadTopic(server, ctx, {});
+  // registerReadPost(server, ctx, {});
+  // registerListCategories(server, ctx, {}); // Disabled - categories don't change
+  // registerListTags(server, ctx, {});
+  // registerGetUser(server, ctx, {});
+  registerListUserPosts(server, ctx, {});
+  registerListHotTopics(server, ctx, {});
+  registerListNotifications(server, ctx, {});
+  registerListTopTopics(server, ctx, {});
+  registerListExcellentTopics(server, ctx, {});
+  registerListFunnyTopics(server, ctx, {});
+  // registerFilterTopics(server, ctx, {});
 }
