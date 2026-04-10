@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildAuthorizationUrl, generateClientId, getBrowserOpenCommand, parseGenerateUserApiKeyArgs, resolveAuthLaunchMode } from '../user-api-key-generator.js';
+import { constants, publicEncrypt } from 'node:crypto';
+import { mkdtempSync } from 'node:fs';
+import { readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { buildAuthorizationUrl, completeUserApiKeyFromState, generateClientId, getBrowserOpenCommand, parseGenerateUserApiKeyArgs, prepareUserApiKeyGeneration, resolveAuthLaunchMode, savePendingUserApiKeyState } from '../user-api-key-generator.js';
 
 test('generateClientId returns unique nitan-mcp UUID values', () => {
   const first = generateClientId();
@@ -52,6 +57,7 @@ test('parseGenerateUserApiKeyArgs supports auth-mode and save-to flags', () => {
   const parsed = parseGenerateUserApiKeyArgs([
     '--site', 'https://www.uscardforum.com',
     '--auth-mode', 'browser',
+    '--state-file', '/tmp/pending.json',
     '--save-to', '/tmp/profile.json',
   ]);
 
@@ -59,6 +65,40 @@ test('parseGenerateUserApiKeyArgs supports auth-mode and save-to flags', () => {
   assert.deepEqual(parsed.options, {
     site: 'https://www.uscardforum.com',
     authMode: 'browser',
+    stateFile: '/tmp/pending.json',
     saveTo: '/tmp/profile.json',
   });
+});
+
+test('resumable generation can complete from a saved state file in a later process', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'nitan-user-api-key-'));
+  const stateFile = path.join(dir, 'pending.json');
+  const profileFile = path.join(dir, 'profile.json');
+
+  try {
+    const prepared = prepareUserApiKeyGeneration({
+      site: 'https://www.uscardforum.com',
+      saveTo: profileFile,
+    });
+    await savePendingUserApiKeyState(stateFile, prepared.state);
+
+    const payload = publicEncrypt(
+      {
+        key: prepared.state.publicKey,
+        padding: constants.RSA_PKCS1_PADDING,
+      },
+      Buffer.from(JSON.stringify({ key: 'user-key-from-payload' }), 'utf8')
+    ).toString('base64');
+
+    await completeUserApiKeyFromState({ stateFile, payload });
+
+    const profile = JSON.parse(await readFile(profileFile, 'utf8'));
+    assert.deepEqual(profile.auth_pairs, [{
+      site: 'https://www.uscardforum.com',
+      user_api_key: 'user-key-from-payload',
+      user_api_client_id: prepared.state.clientId,
+    }]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });

@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import { generateKeyPairSync, privateDecrypt, constants, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createInterface } from "node:readline";
 
 interface KeyPair {
@@ -17,6 +19,7 @@ interface GenerateOptions {
   nonce?: string;
   authRedirect?: string;
   authMode?: AuthLaunchMode;
+  stateFile?: string;
   payload?: string;
   saveTo?: string;
 }
@@ -26,6 +29,24 @@ export type AuthLaunchMode = "url" | "browser";
 export interface ParsedGenerateUserApiKeyArgs {
   options: GenerateOptions;
   showHelp: boolean;
+}
+
+export interface PendingUserApiKeyState {
+  version: 1;
+  createdAt: string;
+  site: string;
+  scopes: string;
+  applicationName: string;
+  clientId: string;
+  nonce: string;
+  publicKey: string;
+  privateKey: string;
+  saveTo?: string;
+}
+
+export interface PreparedUserApiKeyGeneration {
+  authUrl: string;
+  state: PendingUserApiKeyState;
 }
 
 export function generateKeyPair(): KeyPair {
@@ -87,6 +108,10 @@ export function parseGenerateUserApiKeyArgs(args: string[]): ParsedGenerateUserA
         options.authMode = next as AuthLaunchMode;
         i++;
         break;
+      case "--state-file":
+        options.stateFile = next;
+        i++;
+        break;
       case "--payload":
         options.payload = next;
         i++;
@@ -142,6 +167,97 @@ export function buildAuthorizationUrl(options: GenerateOptions, publicKey: strin
 
   url.search = params.toString();
   return url.toString();
+}
+
+export function createPendingUserApiKeyState(options: GenerateOptions): PendingUserApiKeyState {
+  const clientId = options.clientId || generateClientId();
+  const nonce = options.nonce || Date.now().toString();
+  const { publicKey, privateKey } = generateKeyPair();
+
+  return {
+    version: 1,
+    createdAt: new Date().toISOString(),
+    site: options.site,
+    scopes: options.scopes || "read",
+    applicationName: options.applicationName || "Discourse MCP",
+    clientId,
+    nonce,
+    publicKey,
+    privateKey,
+    saveTo: options.saveTo,
+  };
+}
+
+export function prepareUserApiKeyGeneration(options: GenerateOptions): PreparedUserApiKeyGeneration {
+  const state = createPendingUserApiKeyState(options);
+  const authUrl = buildAuthorizationUrl({
+    site: state.site,
+    scopes: state.scopes,
+    applicationName: state.applicationName,
+    clientId: state.clientId,
+    nonce: state.nonce,
+    authRedirect: options.authRedirect,
+  }, state.publicKey);
+  return { authUrl, state };
+}
+
+export function resolvePendingStateFilePath(stateFile?: string): string {
+  return stateFile || join(tmpdir(), `nitan-user-api-key-${randomUUID()}.json`);
+}
+
+export async function savePendingUserApiKeyState(filePath: string, state: PendingUserApiKeyState): Promise<void> {
+  await writeFile(filePath, JSON.stringify(state, null, 2), { encoding: "utf8", mode: 0o600 });
+}
+
+export async function loadPendingUserApiKeyState(filePath: string): Promise<PendingUserApiKeyState> {
+  const raw = JSON.parse(await readFile(filePath, "utf8"));
+  if (
+    raw?.version !== 1 ||
+    typeof raw?.site !== "string" ||
+    typeof raw?.clientId !== "string" ||
+    typeof raw?.nonce !== "string" ||
+    typeof raw?.publicKey !== "string" ||
+    typeof raw?.privateKey !== "string"
+  ) {
+    throw new Error(`Invalid pending state file: ${filePath}`);
+  }
+  return raw as PendingUserApiKeyState;
+}
+
+export function extractUserApiKeyFromPayload(state: PendingUserApiKeyState, payload: string): { key: string; clientId: string; site: string } {
+  const decrypted = decryptPayload(payload, state.privateKey);
+  const result = JSON.parse(decrypted);
+
+  if (!result.key) {
+    throw new Error("Invalid response: missing 'key' field");
+  }
+
+  return {
+    key: result.key,
+    clientId: state.clientId,
+    site: state.site,
+  };
+}
+
+export async function completeUserApiKeyFromState(options: { stateFile: string; payload: string; saveTo?: string }): Promise<void> {
+  const state = await loadPendingUserApiKeyState(options.stateFile);
+  const result = extractUserApiKeyFromPayload(state, options.payload);
+  const saveTo = options.saveTo || state.saveTo;
+
+  if (saveTo) {
+    await saveToProfile(saveTo, result.site, result.key, result.clientId);
+    console.error(`✓ Saved to profile: ${saveTo}\n`);
+    console.log(JSON.stringify({ success: true, profile: saveTo }, null, 2));
+  } else {
+    console.error("Add this to your auth_pairs configuration:\n");
+    console.log(JSON.stringify({
+      site: result.site,
+      user_api_key: result.key,
+      user_api_client_id: result.clientId,
+    }, null, 2));
+  }
+
+  await unlink(options.stateFile).catch(() => undefined);
 }
 
 export function decryptPayload(encryptedPayload: string, privateKey: string): string {
@@ -218,6 +334,7 @@ Options:
   --client-id <id>          Client ID (default: generated UUID)
   --nonce <nonce>           Nonce for request (default: timestamp)
   --auth-mode <mode>        How to start authorization: url or browser (default: url)
+  --state-file <file>       Persist pending auth state and exit so another process can complete later
   --payload <payload>       Encrypted payload (skip interactive prompt)
   --save-to <file>          Save to profile file instead of printing
   --help, -h                Show this help message
@@ -229,8 +346,14 @@ Examples:
   # Save to profile
   nitan-mcp generate-user-api-key --site https://discourse.example.com --save-to profile.json
 
+  # Start a resumable flow
+  nitan-mcp generate-user-api-key --site https://discourse.example.com --state-file /tmp/nitan-user-api-key.json
+
   # Non-interactive with payload
   nitan-mcp generate-user-api-key --site https://discourse.example.com --payload "base64..."
+
+  # Complete later in a new process
+  nitan-mcp complete-user-api-key --state-file /tmp/nitan-user-api-key.json --payload "base64..."
 `);
     process.exit(1);
   }
@@ -239,26 +362,24 @@ Examples:
   console.error(`Site: ${options.site}`);
   console.error(`Scopes: ${options.scopes || "read"}\n`);
 
-  const clientId = options.clientId || generateClientId();
-  const nonce = options.nonce || Date.now().toString();
   const authMode = resolveAuthLaunchMode(options.authMode);
-  const resolvedOptions: GenerateOptions = {
+  const prepared = prepareUserApiKeyGeneration({
     ...options,
-    clientId,
-    nonce,
     authMode,
-  };
+  });
+  const { authUrl, state } = prepared;
 
-  // Step 1: Generate RSA keypair
-  console.error("Generating RSA key pair...");
-  const { publicKey, privateKey } = generateKeyPair();
-  console.error("✓ Key pair generated\n");
-
-  // Step 2: Build authorization URL
-  const authUrl = buildAuthorizationUrl(resolvedOptions, publicKey);
+  console.error(`Client ID: ${state.clientId}`);
+  console.error(`Nonce: ${state.nonce}\n`);
   console.error("Please visit this URL to authorize the application:\n");
   console.error(authUrl);
   console.error("");
+
+  if (options.stateFile) {
+    const stateFile = resolvePendingStateFilePath(options.stateFile);
+    await savePendingUserApiKeyState(stateFile, state);
+    console.error(`Pending auth state saved to: ${stateFile}\n`);
+  }
 
   if (authMode === "browser") {
     console.error("Opening the authorization URL in your default browser...\n");
@@ -276,6 +397,16 @@ Examples:
   let encryptedPayload: string;
   if (options.payload) {
     encryptedPayload = options.payload;
+  } else if (options.stateFile) {
+    console.error("Resumable flow created. Run complete-user-api-key later with --state-file and --payload.\n");
+    console.log(JSON.stringify({
+      success: true,
+      mode: "pending",
+      state_file: resolvePendingStateFilePath(options.stateFile),
+      auth_url: authUrl,
+      user_api_client_id: state.clientId,
+    }, null, 2));
+    return;
   } else {
     console.error("After authorizing, copy the encrypted payload shown by Discourse and paste it below.\n");
 
@@ -288,26 +419,21 @@ Examples:
 
   // Step 4: Decrypt payload
   console.error("\nDecrypting payload...");
-  const decrypted = decryptPayload(encryptedPayload, privateKey);
-  const result = JSON.parse(decrypted);
-
-  if (!result.key) {
-    throw new Error("Invalid response: missing 'key' field");
-  }
+  const result = extractUserApiKeyFromPayload(state, encryptedPayload);
 
   console.error("✓ User API Key retrieved successfully\n");
 
   // Step 5: Output or save
-  if (resolvedOptions.saveTo) {
-    await saveToProfile(resolvedOptions.saveTo, resolvedOptions.site, result.key, clientId);
-    console.error(`✓ Saved to profile: ${resolvedOptions.saveTo}\n`);
-    console.log(JSON.stringify({ success: true, profile: resolvedOptions.saveTo }, null, 2));
+  if (options.saveTo) {
+    await saveToProfile(options.saveTo, options.site, result.key, result.clientId);
+    console.error(`✓ Saved to profile: ${options.saveTo}\n`);
+    console.log(JSON.stringify({ success: true, profile: options.saveTo }, null, 2));
   } else {
     console.error("Add this to your auth_pairs configuration:\n");
     console.log(JSON.stringify({
-      site: resolvedOptions.site,
+      site: options.site,
       user_api_key: result.key,
-      user_api_client_id: clientId,
+      user_api_client_id: result.clientId,
     }, null, 2));
     console.error("\nOr use --save-to <profile.json> to save automatically.");
   }

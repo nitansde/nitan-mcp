@@ -231,6 +231,38 @@ Authorization launch modes:
 - `--auth-mode url` (default): print the authorization URL in the terminal and let the user open it manually.
 - `--auth-mode browser`: automatically open the authorization URL in the default browser, while still showing the URL in the terminal as a fallback.
 
+### Resumable multi-step generation (recommended for agents)
+
+If your MCP host launches a short-lived process that cannot wait for the user to paste the payload back immediately, use the resumable flow.
+
+#### Step 1: start generation and persist pending state
+
+```bash
+npx -y @nitansde/mcp@latest generate-user-api-key \
+  --site https://www.uscardforum.com \
+  --auth-mode browser \
+  --state-file /absolute/path/nitan-user-api-key.json \
+  --save-to /absolute/path/nitan-profile.json
+```
+
+This command:
+
+1. Generates the RSA key pair and a unique client ID.
+2. Prints the authorization URL.
+3. Optionally opens the browser if `--auth-mode browser` is used.
+4. Saves the pending private/public key state to `--state-file`.
+5. Exits without waiting for the payload.
+
+#### Step 2: complete later with the payload
+
+```bash
+npx -y @nitansde/mcp@latest complete-user-api-key \
+  --state-file /absolute/path/nitan-user-api-key.json \
+  --payload "PASTE_THE_ENCRYPTED_PAYLOAD_HERE"
+```
+
+`complete-user-api-key` decrypts the payload using the saved pending state, writes the final `user_api_key` to the profile, and removes the state file on success.
+
 Browser-launch example:
 
 ```bash

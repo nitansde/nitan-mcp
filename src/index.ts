@@ -21,7 +21,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { generateUserApiKey, parseGenerateUserApiKeyArgs, generateKeyPair, generateClientId, buildAuthorizationUrl, decryptPayload, saveToProfile } from "./user-api-key-generator.js";
+import { generateUserApiKey, completeUserApiKeyFromState, parseGenerateUserApiKeyArgs, generateKeyPair, generateClientId, buildAuthorizationUrl, decryptPayload, saveToProfile } from "./user-api-key-generator.js";
 
 // Read package version at runtime to avoid import-attributes incompatibility
 async function getPackageVersion(): Promise<string> {
@@ -463,6 +463,28 @@ async function main() {
       return;
     }
     await generateUserApiKey(options);
+    return;
+  }
+  if (args[0] === "complete-user-api-key") {
+    const { options, showHelp } = parseGenerateUserApiKeyArgs(args.slice(1));
+    if (showHelp || !options.stateFile || !options.payload) {
+      console.error(`
+Usage: nitan-mcp complete-user-api-key --state-file <file> --payload <payload> [--save-to <file>]
+
+Options:
+  --state-file <file>       Pending auth state file created by generate-user-api-key
+  --payload <payload>       Encrypted payload copied from Discourse
+  --save-to <file>          Optional profile path override for the completed key
+  --help, -h                Show this help message
+`);
+      if (showHelp) return;
+      process.exit(1);
+    }
+    await completeUserApiKeyFromState({
+      stateFile: options.stateFile,
+      payload: options.payload,
+      saveTo: options.saveTo,
+    });
     return;
   }
 
