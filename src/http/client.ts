@@ -8,7 +8,6 @@ import {
 } from "./browser_fallback.js";
 import { NodriverCookieClient } from "./nodriver_cookie.js";
 
-
 export type AuthMode =
   | { type: "none" }
   | { type: "api_key"; key: string; username?: string }
@@ -42,7 +41,7 @@ export class HttpError extends Error {
 export class HttpClient {
   private base: URL;
   // Mimics Microsoft Edge browser on Windows to avoid bot detection
-  private userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0";
+  private userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0";
   private cache = new Map<string, { value: any; expiresAt: number }>();
   private cookies = new Map<string, string>(); // Store cookies across requests
   private lastUrl: string | null = null; // Track last URL for Referer header
@@ -52,7 +51,6 @@ export class HttpClient {
   private cloudscraperFailed = false; // Track if cloudscraper has failed
   private browserFallbackClient?: BrowserFallbackClient;
   private nodriverClient: NodriverCookieClient;
-  private nodriverAttempted = false; // Prevent multiple attempts per request cycle
 
   constructor(private opts: HttpClientOptions) {
     this.base = new URL(opts.baseUrl);
@@ -82,12 +80,12 @@ export class HttpClient {
       this.opts.logger.info("Using dual bypass strategy: cloudscraper with curl_cffi fallback");
     }
 
+    this.nodriverClient = new NodriverCookieClient(opts.logger, opts.pythonPath);
+
     if (opts.browserFallback?.enabled) {
       this.browserFallbackClient = new BrowserFallbackClient(this.opts.logger, opts.browserFallback);
       this.opts.logger.info("Browser fallback enabled");
     }
-
-    this.nodriverClient = new NodriverCookieClient(opts.logger, opts.pythonPath);
   }
 
   private headers(): Record<string, string> {
@@ -99,7 +97,7 @@ export class HttpClient {
       "Dnt": "1",
       "Pragma": "no-cache",
       "Priority": "u=1, i",
-      "Sec-Ch-Ua": '"Microsoft Edge";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
+      "Sec-Ch-Ua": '"Microsoft Edge";v="142", "Not?A_Brand";v="8", "Chromium";v="142"',
       "Sec-Ch-Ua-Mobile": "?0",
       "Sec-Ch-Ua-Platform": '"Windows"',
       "Sec-Fetch-Dest": "empty",
@@ -172,7 +170,6 @@ export class HttpClient {
       headers["Content-Type"] = "application/json";
     }
 
-    this.nodriverAttempted = false; // Reset per request cycle
     this.opts.logger.debug(`HTTP ${method} ${url}`);
 
     // Log request headers for debugging
@@ -368,39 +365,47 @@ export class HttpClient {
   }
 
   /**
-   * Launch Chrome via nodriver to solve CF challenge.
-   * The browser proxies the original API request, so we get the response directly.
-   * Also injects any extracted cookies for subsequent requests.
+   * Harvest CF cookies via nodriver (headless Chrome) and retry the request through curl_cffi.
+   * Only called on CF 403 from curl_cffi.
    */
-  private async tryNodriverAndRetry(method: string, url: string): Promise<any | undefined> {
-    if (this.nodriverAttempted) return undefined;
-    this.nodriverAttempted = true;
+  private async tryNodriverHarvestAndRetry(
+    method: string, url: string, headers: Record<string, string>, body?: unknown,
+    requestData?: any,
+  ): Promise<any | undefined> {
+    const harvest = await this.nodriverClient.harvestCookies(url);
+    if (!harvest?.success || !harvest.cookies || Object.keys(harvest.cookies).length === 0) return undefined;
 
-    const result = await this.nodriverClient.extractAndProxy(url);
-    if (!result?.success) return undefined;
+    // Inject harvested cookies
+    for (const [key, value] of Object.entries(harvest.cookies)) {
+      this.cookies.set(key, value);
+    }
+    this.opts.logger.info(`Injected ${Object.keys(harvest.cookies).length} cookies from nodriver, retrying via curl_cffi`);
 
-    // Inject extracted cookies for future requests
+    // Retry with curl_cffi using the new cookies
+    if (!this.curlCffiClient) return undefined;
+
+    const cookiesObj: Record<string, string> = {};
+    this.cookies.forEach((v, k) => { cookiesObj[k] = v; });
+
+    const retryData = {
+      ...requestData,
+      cookies: cookiesObj,
+      headers: { ...headers, Cookie: Object.entries(cookiesObj).map(([k, v]) => `${k}=${v}`).join("; ") },
+    };
+
+    const result = await this.curlCffiClient.request(retryData);
+    if (!result.success || (result.status && result.status >= 400)) return undefined;
+
+    // Store any new cookies from the retry
     if (result.cookies) {
-      for (const [key, value] of Object.entries(result.cookies)) {
-        this.cookies.set(key, value);
-      }
-      this.opts.logger.info(`Injected ${Object.keys(result.cookies).length} cookies from nodriver`);
+      Object.entries(result.cookies).forEach(([k, v]) => { this.cookies.set(k, v); });
     }
 
-    // If the browser proxied the request, use that response directly
-    if (result.proxied_response && result.proxied_response.status === 200) {
-      this.opts.logger.info(`Using proxied response from nodriver (status ${result.proxied_response.status})`);
-      const body = result.proxied_response.body;
-      try {
-        return JSON.parse(body);
-      } catch {
-        return body;
-      }
+    const contentType = result.headers?.["content-type"] || result.headers?.["Content-Type"] || "";
+    if (contentType.includes("application/json")) {
+      return JSON.parse(result.body || "{}");
     }
-
-    // Proxied request failed — cookies were injected for the next request cycle
-    this.opts.logger.info("Nodriver proxy failed, cookies injected for next request");
-    return undefined;
+    return result.body;
   }
 
   private async requestViaBypass(method: string, url: string, headers: Record<string, string>, body?: unknown): Promise<any> {
@@ -538,15 +543,16 @@ export class HttpClient {
         // Check for HTTP errors / Cloudflare challenge
         if (result.status && result.status >= 400) {
           const isChallenge = this.isCloudflareChallenge(result.status, result.body, result.headers);
-          if ((isChallenge || result.status === 403) && this.browserFallbackClient?.isEnabled()) {
-            this.opts.logger.info(`${isChallenge ? 'Cloudflare challenge' : 'HTTP 403'} detected via curl_cffi (${result.status}), switching to browser fallback`);
-            return await this.tryBrowserFallback(method, url, headers, body);
+
+          // On CF 403, try nodriver cookie harvest then retry with curl_cffi
+          if (isChallenge && result.status === 403) {
+            const retried = await this.tryNodriverHarvestAndRetry(method, url, headers, body, requestData);
+            if (retried !== undefined) return retried;
           }
 
-          // On CF challenge 403, try nodriver cookie extraction as last resort
-          if (isChallenge || result.status === 403) {
-            const nodriverResult = await this.tryNodriverAndRetry(method, url);
-            if (nodriverResult !== undefined) return nodriverResult;
+          if (isChallenge && this.browserFallbackClient?.isEnabled()) {
+            this.opts.logger.info(`Cloudflare challenge detected via curl_cffi (${result.status}), switching to browser fallback`);
+            return await this.tryBrowserFallback(method, url, headers, body);
           }
 
           const errorBody = safeJson(result.body || "");

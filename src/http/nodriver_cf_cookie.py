@@ -1,24 +1,31 @@
 #!/usr/bin/env python3
 """
-Nodriver-based Cloudflare cookie extractor.
+Nodriver-based Cloudflare cookie harvester.
 Launches a real Chrome browser to solve CF managed challenges,
-then extracts cookies via JS. Also supports proxying an API request
-through the browser to bypass CF entirely.
+then extracts cookies via JS for replay through curl_cffi.
 
 Input (stdin JSON): {"url": "https://example.com/some/path", "timeout": 60}
-Output (stdout JSON): {"success": true, "cookies": {...}, "proxied_response": {...}}
+Output (stdout JSON): {"success": true, "cookies": {...}}
 """
 
 import sys
 import os
 import json
 import asyncio
+import platform
 
 try:
     import nodriver as uc
     HAS_NODRIVER = True
 except ImportError:
     HAS_NODRIVER = False
+
+
+def _has_display() -> bool:
+    """Check if a graphical display is available (relevant on Linux)."""
+    if platform.system() != "Linux":
+        return True
+    return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
 
 
 def output_and_exit(result: dict, code: int = 0):
@@ -28,19 +35,28 @@ def output_and_exit(result: dict, code: int = 0):
     os._exit(code)
 
 
-async def extract_cookies(base_url: str, api_url: str, timeout: int = 60):
-    """Launch Chrome, solve CF challenge, extract cookies, and optionally proxy API request."""
+async def harvest_cookies(base_url: str, timeout: int = 60):
+    """Launch Chrome, solve CF challenge, and extract cookies for replay."""
     browser = None
     try:
+        browser_args = [
+            "--window-size=1280,720",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-popup-blocking",
+        ]
+
+        if platform.system() == "Windows":
+            import ctypes
+            user32 = ctypes.windll.user32
+            sw, sh = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+            browser_args.append(f"--window-position={sw + 100},{sh + 100}")
+        else:
+            browser_args.append("--window-position=-32000,-32000")
+
         browser = await uc.start(
             headless=False,
-            browser_args=[
-                "--window-position=-32000,-32000",
-                "--window-size=1280,720",
-                "--no-first-run",
-                "--no-default-browser-check",
-                "--disable-popup-blocking",
-            ],
+            browser_args=browser_args,
         )
 
         page = await browser.get(base_url)
@@ -72,7 +88,6 @@ async def extract_cookies(base_url: str, api_url: str, timeout: int = 60):
                 "cookies": {},
             })
 
-        # Extract JS-accessible cookies
         cookie_str = await page.evaluate("document.cookie")
         cookies = {}
         if cookie_str:
@@ -82,34 +97,8 @@ async def extract_cookies(base_url: str, api_url: str, timeout: int = 60):
                     name, value = pair.split("=", 1)
                     cookies[name.strip()] = value.strip()
 
-        print(f"[DEBUG] Got {len(cookies)} JS cookies", file=sys.stderr, flush=True)
+        print(f"[DEBUG] Harvested {len(cookies)} cookies", file=sys.stderr, flush=True)
 
-        # Proxy the actual API request through the browser
-        # This uses the browser's full session (including httpOnly cookies)
-        proxied_response = None
-        if api_url:
-            print(f"[DEBUG] Proxying API request: {api_url}", file=sys.stderr, flush=True)
-            fetch_js = """
-            fetch(URL_PLACEHOLDER, {
-                credentials: 'include',
-                headers: { 'Accept': 'application/json' }
-            }).then(resp => resp.text().then(text => JSON.stringify({ status: resp.status, body: text })))
-              .catch(e => JSON.stringify({ status: 0, body: e.message }))
-            """.replace("URL_PLACEHOLDER", json.dumps(api_url))
-
-            try:
-                raw_result = await asyncio.wait_for(
-                    page.evaluate(fetch_js, await_promise=True),
-                    timeout=15,
-                )
-                proxied_response = json.loads(raw_result)
-                print(f"[DEBUG] Proxied response status: {proxied_response.get('status')}", file=sys.stderr, flush=True)
-            except asyncio.TimeoutError:
-                print(f"[DEBUG] Proxied fetch timed out", file=sys.stderr, flush=True)
-            except Exception as e:
-                print(f"[DEBUG] Proxied fetch error: {e}", file=sys.stderr, flush=True)
-
-        # Stop browser before force-exiting (os._exit skips finally blocks)
         if browser:
             try:
                 browser.stop()
@@ -119,7 +108,6 @@ async def extract_cookies(base_url: str, api_url: str, timeout: int = 60):
         output_and_exit({
             "success": True,
             "cookies": cookies,
-            "proxied_response": proxied_response,
         })
 
     except Exception as e:
@@ -143,6 +131,14 @@ def main():
             "success": False,
             "error": "nodriver module not found. Install with: pip install nodriver",
             "error_type": "ImportError",
+            "cookies": {},
+        })
+
+    if not _has_display():
+        output_and_exit({
+            "success": False,
+            "error": "No graphical display available (set DISPLAY or WAYLAND_DISPLAY on Linux)",
+            "error_type": "DisplayError",
             "cookies": {},
         })
 
@@ -172,10 +168,10 @@ def main():
     parsed = urlparse(url)
     base_url = f"{parsed.scheme}://{parsed.netloc}/"
 
-    print(f"[DEBUG] Extracting CF cookies for {base_url}", file=sys.stderr, flush=True)
+    print(f"[DEBUG] Harvesting CF cookies for {base_url}", file=sys.stderr, flush=True)
 
     loop = uc.loop()
-    loop.run_until_complete(extract_cookies(base_url, url, timeout))
+    loop.run_until_complete(harvest_cookies(base_url, timeout))
 
     output_and_exit({
         "success": False,

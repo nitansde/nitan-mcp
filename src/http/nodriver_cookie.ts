@@ -7,6 +7,8 @@ import type { Logger } from "../util/logger.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+const defaultPythonPath = process.platform === "win32" ? "python" : "python3";
+
 let _scriptPath: string | undefined;
 
 function findPythonScript(): string {
@@ -24,7 +26,6 @@ function findPythonScript(): string {
 export interface NodriverResult {
   success: boolean;
   cookies: Record<string, string>;
-  proxied_response?: { status: number; body: string } | null;
   error?: string;
   error_type?: string;
 }
@@ -35,17 +36,16 @@ export class NodriverCookieClient {
 
   constructor(
     private logger: Logger,
-    pythonPath: string = "python3"
+    pythonPath: string = defaultPythonPath
   ) {
     this.pythonPath = pythonPath;
   }
 
   /**
-   * Launch Chrome via nodriver to solve CF challenge.
-   * Extracts cookies AND proxies the original API request through the browser.
-   * Returns the result, or undefined if nodriver is unavailable.
+   * Launch Chrome via nodriver to solve CF challenge and harvest cookies.
+   * Returns extracted cookies, or undefined if nodriver is unavailable.
    */
-  async extractAndProxy(url: string, timeoutSec: number = 60): Promise<NodriverResult | undefined> {
+  async harvestCookies(url: string, timeoutSec: number = 60): Promise<NodriverResult | undefined> {
     if (this.available === false) return undefined;
 
     return new Promise((resolve) => {
@@ -109,7 +109,7 @@ export class NodriverCookieClient {
             return;
           }
 
-          this.logger.info(`Nodriver: success=${result.success}, cookies=${Object.keys(result.cookies || {}).length}, proxied=${result.proxied_response?.status ?? 'none'}`);
+          this.logger.info(`Nodriver: success=${result.success}, cookies=${Object.keys(result.cookies || {}).length}`);
           resolve(result);
         } catch (e: any) {
           this.logger.error(`Failed to parse nodriver output: ${e.message}`);

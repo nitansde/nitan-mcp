@@ -1,18 +1,20 @@
-# Cloudflare Bypass: Dual Method Strategy
+# Cloudflare Bypass: Multi-Layer Strategy
 
-This project uses an intelligent dual-method approach to bypass Cloudflare protection, providing maximum reliability and automatic fallback.
+This project uses an intelligent multi-layer approach to bypass Cloudflare protection, providing maximum reliability and automatic fallback.
 
 ## Overview
 
-The MCP server now supports **two Cloudflare bypass methods** with automatic fallback:
+The MCP server supports **three Cloudflare bypass methods** with automatic fallback:
 
 1. **Cloudscraper** - Mature Python library for Cloudflare bypass
 2. **curl_cffi** - Modern curl-based solution with better browser impersonation
+3. **nodriver** - Headless Chrome cookie harvester for managed CF challenges (triggered on 403)
 
-When both are enabled (default), the system will:
+When all are enabled (default), the system will:
 1. Try cloudscraper first
 2. If cloudscraper fails (authentication error, CSRF token issues, etc.), automatically fall back to curl_cffi
-3. Remember the failure and use curl_cffi for all subsequent requests
+3. If curl_cffi gets a CF 403, launch nodriver to solve the challenge in a real browser, harvest cookies, inject them, and retry via curl_cffi
+4. Remember the failure and use the working method for subsequent requests
 
 ## Quick Start
 
@@ -25,7 +27,7 @@ When both are enabled (default), the system will:
 
 ### Installation
 
-Install both Python dependencies:
+Install Python dependencies:
 
 ```bash
 pip3 install -r requirements.txt
@@ -34,15 +36,17 @@ pip3 install -r requirements.txt
 Or install individually:
 
 ```bash
-pip3 install cloudscraper curl-cffi
+pip3 install cloudscraper curl-cffi nodriver
 ```
+
+**nodriver** also requires a Chrome or Chromium browser installed on the system.
 
 ### Verify Installation
 
-Test that both libraries are installed:
+Test that all libraries are installed:
 
 ```bash
-python3 -c "import cloudscraper; import curl_cffi; print('Both libraries installed successfully')"
+python3 -c "import cloudscraper; import curl_cffi; import nodriver; print('All libraries installed successfully')"
 ```
 
 ## Configuration
@@ -112,7 +116,7 @@ Or via command line:
 node dist/index.js --python_path=/usr/local/bin/python3.11
 ```
 
-## How the Dual Strategy Works
+## How the Multi-Layer Strategy Works
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -137,15 +141,26 @@ node dist/index.js --python_path=/usr/local/bin/python3.11
          │                 │
          │        ┌────────┴────────┐
          │        │                 │
-         │   ┌────▼────┐      ┌────▼────┐
-         │   │ Success │      │  Failed │
-         │   └────┬────┘      └────┬────┘
-         │        │                 │
-         └────────┼─────────────────┤
-                  │                 │
-         ┌────────▼─────────────────▼────┐
-         │     Return Response or Error   │
-         └────────────────────────────────┘
+         │   ┌────▼────┐    ┌──────▼──────┐
+         │   │ Success │    │ CF 403?     │
+         │   └────┬────┘    └──────┬──────┘
+         │        │                │
+         │        │     ┌──────────▼──────────┐
+         │        │     │ nodriver: launch     │
+         │        │     │ Chrome, solve CF,    │
+         │        │     │ harvest cookies      │
+         │        │     └──────────┬──────────┘
+         │        │                │
+         │        │     ┌──────────▼──────────┐
+         │        │     │ Retry via curl_cffi  │
+         │        │     │ with new cookies     │
+         │        │     └──────────┬──────────┘
+         │        │                │
+         └────────┼────────────────┤
+                  │                │
+         ┌────────▼────────────────▼────┐
+         │     Return Response or Error  │
+         └──────────────────────────────┘
 ```
 
 ### Fallback Logic
@@ -155,21 +170,22 @@ node dist/index.js --python_path=/usr/local/bin/python3.11
    - Logs the failure
    - Marks cloudscraper as failed
    - Immediately tries curl_cffi
-3. **Subsequent Requests**: Uses curl_cffi directly (skips cloudscraper)
-4. **HTTP Errors (4xx/5xx)**: Does NOT trigger fallback (these are real server errors)
+3. **On CF 403 from curl_cffi**: Launches nodriver to solve the challenge, harvests cookies, injects them, and retries via curl_cffi
+4. **Subsequent Requests**: Uses curl_cffi directly with harvested cookies
+5. **HTTP Errors (4xx/5xx)**: Does NOT trigger fallback (these are real server errors, except CF 403)
 
 ## Method Comparison
 
-| Feature | Cloudscraper | curl_cffi |
-|---------|-------------|-----------|
-| **Maturity** | High (established library) | Medium-High (newer) |
-| **Browser Impersonation** | Good | Excellent (uses real curl) |
-| **CSRF Token Handling** | Sometimes fails | More reliable |
-| **Memory Usage** | Higher | Lower |
-| **Speed** | ~200-500ms | ~100-300ms |
-| **Dependencies** | cloudscraper, brotli | curl-cffi |
-| **Cloudflare Bypass** | Good | Excellent |
-| **Best For** | General Cloudflare sites | Aggressive protection |
+| Feature | Cloudscraper | curl_cffi | nodriver |
+|---------|-------------|-----------|----------|
+| **Maturity** | High (established library) | Medium-High (newer) | Medium (Chrome automation) |
+| **Browser Impersonation** | Good | Excellent (uses real curl) | Perfect (real browser) |
+| **CSRF Token Handling** | Sometimes fails | More reliable | N/A (cookie harvester) |
+| **Memory Usage** | Higher | Lower | Highest (launches Chrome) |
+| **Speed** | ~200-500ms | ~100-300ms | ~5-30s (one-time solve) |
+| **Dependencies** | cloudscraper, brotli | curl-cffi | nodriver + Chrome/Chromium |
+| **Cloudflare Bypass** | Good | Excellent | Solves managed challenges |
+| **Best For** | General Cloudflare sites | Aggressive protection | CF managed challenges (403) |
 
 ## When to Use Each Method
 
@@ -231,11 +247,11 @@ If both methods fail:
 
 ### Python Module Not Found
 
-**Error**: `ModuleNotFoundError: No module named 'cloudscraper'` or `'curl_cffi'`
+**Error**: `ModuleNotFoundError: No module named 'cloudscraper'`, `'curl_cffi'`, or `'nodriver'`
 
 **Solution**:
 ```bash
-pip3 install cloudscraper curl-cffi
+pip3 install cloudscraper curl-cffi nodriver
 # Or
 pip3 install -r requirements.txt
 ```
@@ -282,6 +298,8 @@ You'll see logs like:
 [INFO] Marking cloudscraper as failed, will use curl_cffi for future requests
 [INFO] Falling back to curl_cffi...
 [DEBUG] Using curl_cffi for GET https://example.com/
+[INFO] Launching nodriver cookie harvest: https://example.com/
+[INFO] Injected 5 cookies from nodriver, retrying via curl_cffi
 ```
 
 ## Architecture
@@ -319,7 +337,7 @@ Both methods maintain sessions:
 3. **Monitor logs** for consistent failures and adjust configuration if needed
 4. **Keep Python libraries updated** to handle new Cloudflare challenges:
    ```bash
-   pip3 install --upgrade cloudscraper curl-cffi
+   pip3 install --upgrade cloudscraper curl-cffi nodriver
    ```
 5. **Test both methods manually** if experiencing issues to isolate the problem
 
@@ -385,7 +403,8 @@ Note: `use_cloudscraper: true` still works but is deprecated. It now defaults to
 
 - [cloudscraper](https://github.com/VeNoMouS/cloudscraper) by VeNoMouS
 - [curl_cffi](https://github.com/yifeikong/curl_cffi) by yifeikong
-- Dual bypass strategy implemented for Discourse MCP / Nitan MCP
+- [nodriver](https://github.com/ultrafunkamsterdam/nodriver) by ultrafunkamsterdam
+- Multi-layer bypass strategy implemented for Discourse MCP / Nitan MCP
 
 ## See Also
 

@@ -12,7 +12,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && npm run copy:python",
     "skill:pack": "bash scripts/package-skill.sh",
-    "copy:python": "mkdir -p dist/http && cp src/http/cloudscraper_wrapper.py dist/http/ && cp src/http/curl_cffi_wrapper.py dist/http/ && cp src/http/nodriver_cf_cookie.py dist/http/ && cp requirements.txt dist/",
+    "copy:python": "node -e \"const fs=require('fs'),p=require('path');fs.mkdirSync(p.join('dist','http'),{recursive:true});for(const f of['cloudscraper_wrapper.py','curl_cffi_wrapper.py','nodriver_cf_cookie.py'])fs.copyFileSync(p.join('src','http',f),p.join('dist','http',f));fs.copyFileSync('requirements.txt',p.join('dist','requirements.txt'))\"",
     "postinstall": "node scripts/check-python-deps.mjs",
     "prepublishOnly": "pnpm run build",
     "dev": "node --enable-source-maps dist/index.js",
