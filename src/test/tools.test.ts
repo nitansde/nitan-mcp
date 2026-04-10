@@ -26,7 +26,7 @@ test('registers built-in tools', async () => {
   const logger = new Logger('silent');
   const siteState = createSiteState();
   const server = new McpServer({ name: 'test', version: '0.0.0' }, { capabilities: { tools: { listChanged: false } } });
-  await registerAllTools(server as any, siteState, logger, { toolsMode: 'discourse_api_only' });
+  await registerAllTools(server as any, siteState, logger, {});
   assert.ok(true);
 });
 
@@ -55,7 +55,7 @@ function expectedRegisteredToolNames(hideSelectSite = false) {
   return hideSelectSite ? names : ['discourse_select_site', '美卡_选站', ...names];
 }
 
-test('site state prefers API auth over login credentials when both are configured', async () => {
+test('site state keeps login credentials available even when API auth exists', async () => {
   const logger = new Logger('silent');
   const siteState = new SiteState({
     logger,
@@ -73,7 +73,7 @@ test('site state prefers API auth over login credentials when both are configure
   try {
     const { client } = siteState.buildClientForSite('https://example.com');
     assert.deepEqual((client as any).opts.auth, { type: 'user_api_key', key: 'demo-key', client_id: 'demo-client' });
-    assert.equal((client as any).opts.loginCredentials, undefined);
+    assert.deepEqual((client as any).opts.loginCredentials, { username: 'demo-user', password: 'demo-pass', second_factor_token: undefined });
     assert.equal(siteState.hasAuthForSite('https://example.com'), true);
     assert.equal(siteState.hasLoginForSite('https://example.com'), true);
     assert.equal(siteState.hasAuthenticationConfiguredForSite('https://example.com'), true);
@@ -87,7 +87,7 @@ test('built-in tool set contains only read operations', async () => {
   const siteState = createSiteState();
   const tools: Record<string, { handler: Function }> = {};
   const fakeServer: any = { registerTool(name: string, _meta: any, handler: Function) { tools[name] = { handler }; } };
-  await registerAllTools(fakeServer, siteState, logger, { toolsMode: 'discourse_api_only' } as any);
+  await registerAllTools(fakeServer, siteState, logger, {} as any);
   assert.deepEqual(Object.keys(tools).sort(), expectedRegisteredToolNames(false).sort());
 });
 
@@ -111,12 +111,13 @@ test('select-site then search flow works with mocked HTTP', async () => {
   const siteState = createSiteState();
   const tools: Record<string, { handler: Function }> = {};
   const fakeServer: any = { registerTool(name: string, _meta: any, handler: Function) { tools[name] = { handler }; } };
-    await registerAllTools(fakeServer, siteState, logger, { toolsMode: 'discourse_api_only' });
+  await registerAllTools(fakeServer, siteState, logger, {});
 
   const originalFetch = globalThis.fetch;
+  const requestedUrls: string[] = [];
   globalThis.fetch = (async (input: any) => {
     const url = typeof input === 'string' ? input : input.toString();
-    if (url.endsWith('/about.json')) return new Response(JSON.stringify({ about: { title: 'Example Discourse' } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    requestedUrls.push(url);
     if (url.includes('/search.json')) return new Response(JSON.stringify({ topics: [{ id: 123, title: 'Hello World', slug: 'hello-world' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     return new Response('not found', { status: 404 });
   }) as any;
@@ -127,6 +128,7 @@ test('select-site then search flow works with mocked HTTP', async () => {
     const searchRes = await tools['discourse_search'].handler({ query: 'hello' }, {});
     const text = String(searchRes?.content?.[0]?.text || '');
     expectSearchOutput(text);
+    assert.deepEqual(requestedUrls, ['https://example.com/search.json?expanded=true&q=hello']);
   } finally {
     globalThis.fetch = originalFetch as any;
   }
@@ -141,16 +143,13 @@ test('tethered mode hides select_site and allows search without selection', asyn
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async (input: any) => {
     const url = typeof input === 'string' ? input : input.toString();
-    if (url.endsWith('/about.json')) return new Response(JSON.stringify({ about: { title: 'Example Discourse' } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     if (url.includes('/search.json')) return new Response(JSON.stringify({ topics: [{ id: 123, title: 'Hello World', slug: 'hello-world' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     return new Response('not found', { status: 404 });
   }) as any;
 
   try {
-    const { base, client } = siteState.buildClientForSite('https://example.com');
-    await client.get('/about.json');
-    siteState.selectSite(base);
-    await registerAllTools(fakeServer, siteState, logger, { toolsMode: 'discourse_api_only', hideSelectSite: true } as any);
+    siteState.selectSite('https://example.com');
+    await registerAllTools(fakeServer, siteState, logger, { hideSelectSite: true } as any);
     assert.ok(!('discourse_select_site' in tools));
     const searchRes = await tools['discourse_search'].handler({ query: 'hello' }, {});
     const text = String(searchRes?.content?.[0]?.text || '');
@@ -171,16 +170,13 @@ test('default-search prefix is applied to queries', async () => {
   globalThis.fetch = (async (input: any) => {
     const url = typeof input === 'string' ? input : input.toString();
     lastUrl = url;
-    if (url.endsWith('/about.json')) return new Response(JSON.stringify({ about: { title: 'Example Discourse' } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     if (url.includes('/search.json')) return new Response(JSON.stringify({ topics: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     return new Response('not found', { status: 404 });
   }) as any;
 
   try {
-    const { base, client } = siteState.buildClientForSite('https://example.com');
-    await client.get('/about.json');
-    siteState.selectSite(base);
-    await registerAllTools(fakeServer, siteState, logger, { toolsMode: 'discourse_api_only', defaultSearchPrefix: 'tag:ai order:latest-post' } as any);
+    siteState.selectSite('https://example.com');
+    await registerAllTools(fakeServer, siteState, logger, { defaultSearchPrefix: 'tag:ai order:latest-post' } as any);
     await tools['discourse_search'].handler({ query: 'hello world' }, {});
     assert.ok(lastUrl && lastUrl.includes('/search.json?'));
     const qs = lastUrl!.split('?')[1] || '';
@@ -220,7 +216,7 @@ test('notifications tool reports Cloudflare challenge instead of not logged in',
     },
   };
 
-  registerListNotifications(fakeServer, { siteState: fakeSiteState, maxReadLength: 50000 } as any, { toolsMode: 'discourse_api_only' });
+  registerListNotifications(fakeServer, { siteState: fakeSiteState, maxReadLength: 50000 } as any, {});
 
   const result = await fakeServerTools['discourse_list_notifications'].handler({ limit: 5, unread_only: false }, {});
   const text = String(result?.content?.[0]?.text || '');
@@ -283,7 +279,7 @@ test('trust-level tool uses directory_items.json and reports TL3 progress from m
     const { base, client } = siteState.buildClientForSite('https://example.com');
     await client.get('/about.json');
     siteState.selectSite(base);
-    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', hideSelectSite: true } as any);
+    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, hideSelectSite: true } as any);
 
     const result = await tools['discourse_get_trust_level_progress'].handler({ username: 'uscreditcardguide' }, {});
     const text = String(result?.content?.[0]?.text || '');
@@ -339,7 +335,7 @@ test('trust-level tool falls back to summary trust level when directory data is 
     const { base, client } = siteState.buildClientForSite('https://example.com');
     await client.get('/about.json');
     siteState.selectSite(base);
-    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', hideSelectSite: true } as any);
+    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, hideSelectSite: true } as any);
 
     const result = await tools['discourse_get_trust_level_progress'].handler({ username: 'example' }, {});
     const text = String(result?.content?.[0]?.text || '');
@@ -402,7 +398,7 @@ test('trust-level tool ignores non-exact directory rows instead of using the fir
     const { base, client } = siteState.buildClientForSite('https://example.com');
     await client.get('/about.json');
     siteState.selectSite(base);
-    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', hideSelectSite: true } as any);
+    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, hideSelectSite: true } as any);
 
     const result = await tools['discourse_get_trust_level_progress'].handler({ username: 'example' }, {});
     const text = String(result?.content?.[0]?.text || '');
@@ -458,7 +454,7 @@ test('trust-level tool shows TL4 as highest level instead of TL3 retention', asy
     const { base, client } = siteState.buildClientForSite('https://example.com');
     await client.get('/about.json');
     siteState.selectSite(base);
-    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', hideSelectSite: true } as any);
+    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, hideSelectSite: true } as any);
 
     const result = await tools['discourse_get_trust_level_progress'].handler({ username: 'leader' }, {});
     const text = String(result?.content?.[0]?.text || '');
@@ -499,7 +495,7 @@ test('notifications tool prompts auth setup when neither API key nor login crede
     },
   };
 
-  registerListNotifications(fakeServer, { siteState: fakeSiteState, maxReadLength: 50000 } as any, { toolsMode: 'discourse_api_only' });
+  registerListNotifications(fakeServer, { siteState: fakeSiteState, maxReadLength: 50000 } as any, {});
 
   const result = await fakeServerTools['discourse_list_notifications'].handler({ limit: 5, unread_only: false }, {});
   const text = String(result?.content?.[0]?.text || '');

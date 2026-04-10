@@ -56,7 +56,7 @@ export class SiteState {
     if (cached) return { base, client: cached };
 
     const auth = this.resolveAuthForSite(base);
-    const loginCreds = auth.type === "none" ? this.resolveLoginForSite(base) : undefined;
+    const loginCreds = this.resolveLoginForSite(base);
     
     // Determine bypass method (support legacy useCloudscraper option)
     let bypassMethod: BypassMethod | undefined = this.opts.bypassMethod;

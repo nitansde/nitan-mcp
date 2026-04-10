@@ -43,8 +43,7 @@ import {
   resolveBrowserFallbackEnabled,
   resolveBrowserFallbackProvider,
 } from "./http/browser_fallback_defaults.js";
-import { registerAllTools, type ToolsMode } from "./tools/registry.js";
-import { tryRegisterRemoteTools } from "./tools/remote/tool_exec_api.js";
+import { registerAllTools } from "./tools/registry.js";
 import { SiteState, type AuthOverride } from "./site/state.js";
 
 const DEFAULT_TIMEOUT_MS = 15000;
@@ -72,7 +71,6 @@ const ProfileSchema = z
     concurrency: z.number().int().positive().optional().default(4),
     cache_dir: z.string().optional(),
     log_level: z.enum(["silent", "error", "info", "debug"]).optional().default("info"),
-    tools_mode: z.enum(["auto", "discourse_api_only", "tool_exec_api"]).optional().default("auto"),
     site: z.string().url().optional().default("https://www.uscardforum.com/").describe("Tether MCP to a single Discourse site; defaults to uscardforum.com"),
     default_search: z.string().optional().describe("Optional search prefix added to every search query (set via --default-search)"),
     max_read_length: z
@@ -211,7 +209,6 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
     concurrency: (flags.concurrency as number | undefined) ?? profile.concurrency ?? 4,
     cache_dir: ((flags.cache_dir ?? flags["cache-dir"]) as string | undefined) ?? profile.cache_dir,
     log_level: (((flags.log_level ?? flags["log-level"]) as LogLevel | undefined) ?? (profile.log_level as LogLevel | undefined) ?? "info") as LogLevel,
-    tools_mode: (((flags.tools_mode ?? flags["tools-mode"]) as ToolsMode | undefined) ?? (profile.tools_mode as ToolsMode | undefined) ?? "auto") as ToolsMode,
     site: site ?? "https://www.uscardforum.com/",
     default_search: (((flags.default_search ?? flags["default-search"]) as string | undefined) ?? profile.default_search) as string | undefined,
     max_read_length: (((flags.max_read_length ?? flags["max-read-length"]) as number | undefined) ?? profile.max_read_length ?? 50000) as number,
@@ -554,40 +551,22 @@ Options:
     }
   );
 
-  // If tethered to a site, validate and preselect it before registering tools,
-  // and trigger remote tool discovery when enabled.
   let hideSelectSite = false;
   if (config.site) {
     try {
-      const { base, client } = siteState.buildClientForSite(config.site);
-      if (!config.skip_site_validation) {
-        const about = (await client.get(`/about.json`)) as any;
-        const title = about?.about?.title || about?.title || base;
-        siteState.selectSite(base);
-        hideSelectSite = true;
-        logger.info(`Tethered to site: ${base} (${title})`);
-      } else {
-        siteState.selectSite(base);
-        hideSelectSite = true;
-        logger.info(`Tethered to site without validation: ${base}`);
-      }
+      const { base } = siteState.selectSite(config.site);
+      hideSelectSite = true;
+      logger.info(`Tethered to site: ${base}`);
     } catch (e: any) {
-      throw new Error(`Failed to validate --site ${config.site}: ${e?.message || String(e)}`);
+      throw new Error(`Failed to initialize --site ${config.site}: ${e?.message || String(e)}`);
     }
   }
 
   await registerAllTools(server as any, siteState, logger, {
-    toolsMode: config.tools_mode,
     hideSelectSite,
     defaultSearchPrefix: config.default_search,
     maxReadLength: config.max_read_length,
   });
-
-  // If tethered and remote tool discovery is enabled, discover now
-  // Skip for uscardforum.com as it doesn't have AI tools endpoint
-  if (config.site && config.tools_mode !== "discourse_api_only" && !config.site.includes("uscardforum.com")) {
-    await tryRegisterRemoteTools(server as any, siteState, logger);
-  }
 
   // Create transport based on configuration
   if (config.transport === "http") {

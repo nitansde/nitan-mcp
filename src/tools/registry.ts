@@ -17,11 +17,8 @@ import { registerListExcellentTopics } from "./builtin/list_excellent_topics.js"
 import { registerListFunnyTopics } from "./builtin/list_funny_topics.js";
 import { registerGetTrustLevelProgress } from "./builtin/get_trust_level_progress.js";
 
-export type ToolsMode = "auto" | "discourse_api_only" | "tool_exec_api";
-
 export interface RegistryOptions {
   allowWrites?: boolean;
-  toolsMode: ToolsMode;
   // When true, do not register the discourse_select_site tool
   hideSelectSite?: boolean;
   // Optional default search prefix to add to all searches
@@ -77,7 +74,7 @@ export async function registerAllTools(
 
   // Built-in tools
   if (!opts.hideSelectSite) {
-    registerSelectSite(aliasedServer, ctx, { allowWrites: false, toolsMode: opts.toolsMode });
+    registerSelectSite(aliasedServer, ctx, {});
   }
   registerSearch(aliasedServer, ctx, { allowWrites: false });
   registerReadTopic(aliasedServer, ctx, { allowWrites: false });
