@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 import { HttpClient } from "../http/client.js";
 import { Logger } from "../util/logger.js";
 
-function createHttpClientForFallbackTests(): HttpClient {
+function createHttpClientForFallbackTests(options?: { loginCredentials?: { username: string; password: string; second_factor_token?: string } }): HttpClient {
   return new HttpClient({
     baseUrl: "https://www.uscardforum.com",
     timeoutMs: 5_000,
     logger: new Logger("silent"),
     auth: { type: "none" },
+    loginCredentials: options?.loginCredentials,
     bypassMethod: "both",
     browserFallback: {
       enabled: true,
@@ -19,7 +20,7 @@ function createHttpClientForFallbackTests(): HttpClient {
 }
 
 test("browser fallback retries once after auto-login attempt", async () => {
-  const client = createHttpClientForFallbackTests();
+  const client = createHttpClientForFallbackTests({ loginCredentials: { username: 'demo-user', password: 'demo-password' } });
 
   let requestCalls = 0;
   let autoLoginCalls = 0;
@@ -63,7 +64,7 @@ test("browser fallback retries once after auto-login attempt", async () => {
 });
 
 test("browser fallback keeps interactive flow when auto-login env is missing", async () => {
-  const client = createHttpClientForFallbackTests();
+  const client = createHttpClientForFallbackTests({ loginCredentials: { username: 'demo-user', password: 'demo-password' } });
 
   let requestCalls = 0;
   let autoLoginCalls = 0;
@@ -102,7 +103,7 @@ test("browser fallback keeps interactive flow when auto-login env is missing", a
 });
 
 test("browser fallback prompts interactive login when retry still lands on login page", async () => {
-  const client = createHttpClientForFallbackTests();
+  const client = createHttpClientForFallbackTests({ loginCredentials: { username: 'demo-user', password: 'demo-password' } });
 
   let requestCalls = 0;
   let autoLoginCalls = 0;
@@ -138,4 +139,46 @@ test("browser fallback prompts interactive login when retry still lands on login
   assert.equal(autoLoginCalls, 1);
   assert.equal(interactiveCalls, 1);
   await client.dispose();
+});
+
+test("native fetch challenge escalates to browser fallback", async () => {
+  const client = createHttpClientForFallbackTests();
+  const originalFetch = globalThis.fetch;
+
+  (client as any).cloudscraperClient = undefined;
+  (client as any).curlCffiClient = undefined;
+
+  let browserFallbackCalls = 0;
+  (client as any).browserFallbackClient = {
+    isEnabled: () => true,
+    request: async () => {
+      browserFallbackCalls += 1;
+      return {
+        status: 200,
+        body: "{\"ok\":true}",
+        headers: { "content-type": "application/json" },
+        finalUrl: "https://www.uscardforum.com/notifications.json",
+      };
+    },
+    maybeAutoLogin: async () => false,
+    maybePromptInteractiveLogin: async () => undefined,
+  };
+
+  globalThis.fetch = (async () => new Response("<!DOCTYPE html><html><body>Just a moment...</body></html>", {
+    status: 403,
+    headers: {
+      "content-type": "text/html; charset=UTF-8",
+      "cf-mitigated": "challenge",
+      server: "cloudflare",
+    },
+  })) as any;
+
+  try {
+    const result = await client.get("/notifications.json?limit=5");
+    assert.deepEqual(result, { ok: true });
+    assert.equal(browserFallbackCalls, 1);
+  } finally {
+    globalThis.fetch = originalFetch as any;
+    await client.dispose();
+  }
 });

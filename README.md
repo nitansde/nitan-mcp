@@ -202,7 +202,101 @@ pip install -r requirements.txt
 During `npm install`, postinstall now prefers local `.venv` and installs requirements via `.venv` Python/pip.
 
 ### MCP Client Configuration
+### API key setup (recommended)
+
+If you want authenticated reads without storing forum login credentials in your MCP client config, generate a Discourse User API key once and save it to a profile file.
+
+#### Generate and save the API key
+
+Using the published package:
+
+```bash
+npx -y @nitansde/mcp@latest generate-user-api-key \
+  --site https://www.uscardforum.com \
+  --auth-mode url \
+  --save-to /absolute/path/nitan-profile.json
+```
+
+Using a local checkout after `npm run build`:
+
+```bash
+node dist/index.js generate-user-api-key \
+  --site https://www.uscardforum.com \
+  --auth-mode url \
+  --save-to /absolute/path/nitan-profile.json
+```
+
+Authorization launch modes:
+
+- `--auth-mode url` (default): print the authorization URL in the terminal and let the user open it manually.
+- `--auth-mode browser`: automatically open the authorization URL in the default browser, while still showing the URL in the terminal as a fallback.
+
+Browser-launch example:
+
+```bash
+npx -y @nitansde/mcp@latest generate-user-api-key \
+  --site https://www.uscardforum.com \
+  --auth-mode browser \
+  --save-to /absolute/path/nitan-profile.json
+```
+
+What happens:
+
+1. The CLI generates a temporary RSA key pair.
+2. It prints a Discourse authorization URL.
+3. Open that URL, log into uscardforum, and authorize the application.
+4. Discourse shows an encrypted payload on the page.
+5. Copy that payload and paste it back into the terminal prompt.
+6. The CLI decrypts it and saves `user_api_key` + `user_api_client_id` into the profile file.
+
+The current flow uses the manual copy/paste payload path and requests `read` scope by default.
+
+Example saved profile:
+
+```json
+{
+  "auth_pairs": [
+    {
+      "site": "https://www.uscardforum.com",
+      "user_api_key": "YOUR_USER_API_KEY",
+      "user_api_client_id": "nitan-mcp-550e8400-e29b-41d4-a716-446655440000"
+    }
+  ]
+}
+```
+
+If you do not pass `--client-id`, the generator creates a unique `nitan-mcp-<uuid>` client ID by default.
+
+#### Use the saved API key in your MCP client
+
+Point the server at the saved profile file with `--profile`.
+
 **For Claude Desktop (macOS/Windows):**
+```json
+{
+  "mcpServers": {
+    "nitan": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@nitansde/mcp@latest",
+        "--profile",
+        "/absolute/path/nitan-profile.json"
+      ],
+      "env": {
+        "TIMEZONE": "America/New_York"
+      }
+    }
+  }
+}
+```
+
+If an API key exists for the selected site, the server uses that first.
+
+### Login via environment variables (alternative to API key)
+
+If you do not want to use an API key, you can provide login credentials instead.
+
 ```json
 {
   "mcpServers": {
@@ -221,9 +315,14 @@ During `npm install`, postinstall now prefers local `.venv` and installs require
 }
 ```
 
-`NITAN_USERNAME` and `NITAN_PASSWORD` are optional for public read-only access.
+Behavior summary:
 
-Use optinal env `"TIMEZONE": "America/New_York"` if you want to use a timezone different to your local clock.
+- API key and login credentials are alternative auth setups.
+- If an API key exists for the site, it is preferred.
+- If no API key exists but `NITAN_USERNAME` / `NITAN_PASSWORD` are configured, login mode is used.
+- If neither exists, public tools still work, but auth-required tools will ask you to set up an API key or provide `NITAN_USERNAME` / `NITAN_PASSWORD`.
+
+Use optional env `"TIMEZONE": "America/New_York"` if you want a timezone different from your local clock.
 
 **Configuration file location:**
 ```

@@ -240,84 +240,6 @@ Get recent excellent topics from the forum. An excellent topic is a topic with o
 
 ---
 
-## Write Operations (Authentication Required)
-
-### discourse_create_post
-Create a new post (reply) in an existing topic.
-
-**Input:**
-```json
-{
-  "topic_id": 12345,
-  "raw": "This is my reply to the topic..."
-}
-```
-
-**Output:**
-- Link to the created post
-- Rate limited to ~1 request/second
-
----
-
-### discourse_create_topic
-Create a new topic.
-
-**Input:**
-```json
-{
-  "title": "My New Topic Title",
-  "raw": "This is the content of my topic...",
-  "category_id": 3,        // Optional: category ID
-  "tags": ["question", "beginner"]  // Optional: topic tags
-}
-```
-
-**Output:**
-- Link to the created topic
-- Rate limited to ~1 request/second
-
----
-
-### discourse_create_category
-Create a new category (admin/moderator only).
-
-**Input:**
-```json
-{
-  "name": "New Category",
-  "color": "0088CC",              // Optional: hex color
-  "text_color": "FFFFFF",         // Optional: hex text color
-  "parent_category_id": 5,        // Optional: parent category
-  "description": "Category description..."  // Optional
-}
-```
-
-**Output:**
-- Link to the created category
-- Rate limited to ~1 request/second
-
----
-
-### discourse_create_user
-Create a new user account (admin only).
-
-**Input:**
-```json
-{
-  "name": "John Doe",
-  "email": "john@example.com",
-  "password": "securepassword",
-  "username": "john_doe",
-  "active": true  // Optional: activate immediately
-}
-```
-
-**Output:**
-- User profile link
-- Rate limited to ~1 request/second
-
----
-
 ## Enhanced Category Support
 
 The `discourse_filter_topics` tool now supports natural language category names.
@@ -405,13 +327,6 @@ See `src/tools/categories.ts` for the complete mapping.
 These tools require authentication via `--username` and `--password`:
 - `discourse_list_notifications`
 - `discourse_get_user_activity` (for private content)
-- All write operations (create_post, create_topic, etc.)
-
-### Write Operations
-Write tools are only available when:
-1. `--allow-writes` flag is set AND
-2. `--read-only` is false (or not set) AND
-3. Authentication is configured via `--auth-pairs` or username/password
 
 ### Disabled Tools
 The `discourse_list_categories` tool has been **disabled** because:
@@ -425,7 +340,7 @@ If you need to see all categories, refer to `src/tools/categories.ts` or use the
 
 ## Authentication
 
-All write operations and some read operations (like notifications) require authentication:
+Some read operations (like notifications) require authentication:
 
 ```bash
 nitan-mcp \

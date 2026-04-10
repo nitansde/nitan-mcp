@@ -10,5 +10,8 @@ export interface ToolContext {
   maxReadLength: number;
 }
 
-export type RegisterFn = (server: McpServer, ctx: ToolContext, opts: { allowWrites: boolean; toolsMode?: string }) => void | Promise<void>;
-
+export type RegisterFn = (
+  server: McpServer,
+  ctx: ToolContext,
+  opts: { allowWrites?: boolean; toolsMode?: string }
+) => void | Promise<void>;

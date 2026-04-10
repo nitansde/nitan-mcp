@@ -2,6 +2,43 @@ import { z } from "zod";
 import type { RegisterFn } from "../types.js";
 import { formatTimestamp } from "../../util/timestamp.js";
 
+function collectErrorText(error: any): string {
+  const parts: string[] = [];
+  if (typeof error?.message === "string") parts.push(error.message);
+
+  const body = error?.body;
+  if (typeof body === "string") {
+    parts.push(body);
+  } else if (body && typeof body === "object") {
+    for (const value of Object.values(body)) {
+      if (typeof value === "string") parts.push(value);
+    }
+  }
+
+  return parts.join("\n").toLowerCase();
+}
+
+function isCloudflareChallengeError(error: any): boolean {
+  const text = collectErrorText(error);
+  return (
+    text.includes("just a moment") ||
+    text.includes("attention required") ||
+    text.includes("/cdn-cgi/challenge-platform/") ||
+    text.includes("cf-challenge") ||
+    text.includes("cf-mitigated") ||
+    text.includes("cloudflare")
+  );
+}
+
+function isExplicitNotLoggedInError(error: any): boolean {
+  const text = collectErrorText(error);
+  return (
+    text.includes("not_logged_in") ||
+    text.includes("you are not permitted to view the requested resource") ||
+    text.includes("您需要登录")
+  );
+}
+
 export const registerListNotifications: RegisterFn = (server, ctx) => {
   const schema = z
     .object({
@@ -23,12 +60,23 @@ export const registerListNotifications: RegisterFn = (server, ctx) => {
     "discourse_list_notifications",
     {
       title: "List Notifications",
-      description: "Get user notifications from the forum. Requires authentication with user credentials.",
+      description: "Get user notifications from the forum. Requires either a User API key or configured login credentials.",
       inputSchema: schema.shape,
     },
     async ({ limit = 30, unread_only = true }, _extra: any) => {
       try {
         const { base, client } = ctx.siteState.ensureSelectedSite();
+        if (!ctx.siteState.hasAuthenticationConfiguredForSite(base)) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: "Unable to fetch notifications: authentication is required. Set up an API key or provide NITAN_USERNAME/NITAN_PASSWORD.",
+              },
+            ],
+            isError: true,
+          };
+        }
         const maxReadLength = Number.isFinite(ctx.maxReadLength) ? ctx.maxReadLength : 50000;
         
         // Fetch notifications from the API
@@ -128,13 +176,24 @@ export const registerListNotifications: RegisterFn = (server, ctx) => {
         const text = JSON.stringify(jsonOutput, null, 2);
         return { content: [{ type: "text", text }] };
       } catch (e: any) {
-        // Check if this is a "not logged in" error (403 with not_logged_in error_type)
-        if (e?.status === 403 || (e?.message && (e.message.includes("not_logged_in") || e.message.includes("您需要登录")))) {
+        if (isCloudflareChallengeError(e)) {
           return {
             content: [
               {
                 type: "text",
-                text: "Unable to fetch notifications: User is not logged in. Notifications require authentication with username and password.",
+                text: "Unable to fetch notifications: Cloudflare challenge blocked the request. Retry with browser fallback enabled and an active browser session.",
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        if (isExplicitNotLoggedInError(e)) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: "Unable to fetch notifications: authentication failed. Set up an API key or provide NITAN_USERNAME/NITAN_PASSWORD.",
               },
             ],
             isError: true,

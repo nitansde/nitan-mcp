@@ -1,7 +1,0 @@
----
-description: Always include our AI agents guide
-globs:
-alwaysApply: true
----
-
-@AGENTS.md

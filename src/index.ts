@@ -12,7 +12,7 @@ if (majorVersion < 18) {
   process.exit(1);
 }
 
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
@@ -21,7 +21,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { generateUserApiKey } from "./user-api-key-generator.js";
+import { generateUserApiKey, parseGenerateUserApiKeyArgs, generateKeyPair, generateClientId, buildAuthorizationUrl, decryptPayload, saveToProfile } from "./user-api-key-generator.js";
 
 // Read package version at runtime to avoid import-attributes incompatibility
 async function getPackageVersion(): Promise<string> {
@@ -68,8 +68,6 @@ const ProfileSchema = z
           .strict()
       )
       .optional(),
-    read_only: z.boolean().optional().default(true),
-    allow_writes: z.boolean().optional().default(false),
     timeout_ms: z.number().int().positive().optional().default(DEFAULT_TIMEOUT_MS),
     concurrency: z.number().int().positive().optional().default(4),
     cache_dir: z.string().optional(),
@@ -209,8 +207,6 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
   
   const merged = {
     auth_pairs: authPairs,
-    read_only: ((flags.read_only ?? flags["read-only"]) as boolean | undefined) ?? profile.read_only ?? true,
-    allow_writes: ((flags.allow_writes ?? flags["allow-writes"]) as boolean | undefined) ?? profile.allow_writes ?? false,
     timeout_ms: ((flags.timeout_ms ?? flags["timeout-ms"]) as number | undefined) ?? profile.timeout_ms ?? DEFAULT_TIMEOUT_MS,
     concurrency: (flags.concurrency as number | undefined) ?? profile.concurrency ?? 4,
     cache_dir: ((flags.cache_dir ?? flags["cache-dir"]) as string | undefined) ?? profile.cache_dir,
@@ -461,21 +457,10 @@ async function main() {
     return;
   }
   if (args[0] === "generate-user-api-key") {
-    const options: any = { site: "" };
-    for (let i = 1; i < args.length; i++) {
-      const arg = args[i];
-      const next = args[i + 1];
-      if (arg === "--site") { options.site = next; i++; }
-      else if (arg === "--scopes") { options.scopes = next; i++; }
-      else if (arg === "--application-name") { options.applicationName = next; i++; }
-      else if (arg === "--client-id") { options.clientId = next; i++; }
-      else if (arg === "--nonce") { options.nonce = next; i++; }
-      else if (arg === "--payload") { options.payload = next; i++; }
-      else if (arg === "--save-to") { options.saveTo = next; i++; }
-      else if (arg === "--help" || arg === "-h") {
-        await generateUserApiKey({ site: "" }); // Will show help and exit
-        return;
-      }
+    const { options, showHelp } = parseGenerateUserApiKeyArgs(args.slice(1));
+    if (showHelp) {
+      await generateUserApiKey({ site: "" }); // Will show help and exit
+      return;
     }
     await generateUserApiKey(options);
     return;
@@ -547,8 +532,6 @@ async function main() {
     }
   );
 
-  const allowWrites = Boolean(config.allow_writes && !config.read_only && (config.auth_pairs && config.auth_pairs.length > 0));
-
   // If tethered to a site, validate and preselect it before registering tools,
   // and trigger remote tool discovery when enabled.
   let hideSelectSite = false;
@@ -572,7 +555,6 @@ async function main() {
   }
 
   await registerAllTools(server as any, siteState, logger, {
-    allowWrites,
     toolsMode: config.tools_mode,
     hideSelectSite,
     defaultSearchPrefix: config.default_search,
@@ -587,24 +569,256 @@ async function main() {
 
   // Create transport based on configuration
   if (config.transport === "http") {
-    // HTTP transport using Streamable HTTP (stateless mode)
+    // HTTP transport using Streamable HTTP
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined, // Stateless mode
+      sessionIdGenerator: undefined,
       enableJsonResponse: true,
     });
 
     await server.connect(transport);
 
+    const startedAt = new Date().toISOString();
+
+    // Auth state for unauthenticated servers — generate keypair at startup,
+    // auth URL is built per-request using the Host header so the callback
+    // automatically matches however the client reached us (Funnel, Tailscale DNS, localhost).
+    const hasAuth = Boolean(config.site && siteState.hasAuthForSite(config.site));
+    let pendingAuthKeys: {
+      publicKey: string;
+      privateKey: string;
+      nonce: string;
+      clientId: string;
+    } | null = null;
+
+    if (!hasAuth && config.site) {
+      const keyPair = generateKeyPair();
+      const nonce = Date.now().toString();
+      const clientId = generateClientId();
+      pendingAuthKeys = {
+        publicKey: keyPair.publicKey,
+        privateKey: keyPair.privateKey,
+        nonce,
+        clientId,
+      };
+      logger.info(`No auth configured — visit /health to get the authorization URL.`);
+    }
+
+    /** Derive the external base URL from the incoming request's Host header. */
+    function getCallbackBaseUrl(req: import("node:http").IncomingMessage): string {
+      const host = req.headers["x-forwarded-host"] || req.headers.host;
+      if (host) {
+        const proto = (req.headers["x-forwarded-proto"] as string) || (host.toString().match(/\.ts\.net/) ? "https" : "http");
+        return `${proto}://${host}`;
+      }
+      return `http://localhost:${config.port}`;
+    }
+
+    function buildPendingAuthUrl(): string | null {
+      if (!pendingAuthKeys || !config.site) return null;
+      return buildAuthorizationUrl(
+        {
+          site: config.site,
+          applicationName: "Nitan MCP",
+          clientId: pendingAuthKeys.clientId,
+          nonce: pendingAuthKeys.nonce,
+          scopes: "read",
+        },
+        pendingAuthKeys.publicKey
+      );
+    }
+
+    const resolvedProfilePath = profilePath || "profile.json";
+
     const httpServer = createServer(async (req, res) => {
+      const parsedUrl = new URL(req.url || "/", `http://localhost:${config.port}`);
+
       // Health check endpoint
-      if (req.method === "GET" && req.url === "/health") {
+      if (req.method === "GET" && parsedUrl.pathname === "/health") {
+        const health: Record<string, unknown> = {
+          status: "ok",
+          started_at: startedAt,
+          uptime_seconds: Math.floor(process.uptime()),
+          authenticated: !pendingAuthKeys,
+          auth_page: `${getCallbackBaseUrl(req)}/auth`,
+        };
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ status: "ok" }));
+        res.end(JSON.stringify(health));
+        return;
+      }
+
+      // Auth page endpoint
+      if (req.method === "GET" && parsedUrl.pathname === "/auth") {
+        const authUrl = buildPendingAuthUrl();
+        const isAuthenticated = !pendingAuthKeys;
+        const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Nitan MCP Auth</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; background: #121212; color: #eee; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+    .card { background: #1e1e1e; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); max-width: 500px; width: 100%; margin: 1rem; }
+    h1 { margin-top: 0; font-size: 1.5rem; }
+    .status { margin-bottom: 1.5rem; padding: 0.5rem 0.75rem; border-radius: 4px; font-weight: bold; }
+    .status.auth { background: #2e7d32; color: #fff; }
+    .status.no-auth { background: #c62828; color: #fff; }
+    .btn { display: inline-block; background: #3f51b5; color: white; padding: 0.5rem 1rem; text-decoration: none; border-radius: 4px; border: none; cursor: pointer; font-size: 1rem; width: 100%; box-sizing: border-box; text-align: center; }
+    .btn:hover { background: #303f9f; }
+    .btn-red { background: #d32f2f; }
+    .btn-red:hover { background: #b71c1c; }
+    form { margin-top: 1.5rem; }
+    textarea { width: 100%; height: 100px; background: #2c2c2c; border: 1px solid #444; color: #eee; padding: 0.5rem; border-radius: 4px; margin-bottom: 1rem; box-sizing: border-box; font-family: monospace; }
+    label { display: block; margin-bottom: 0.5rem; font-size: 0.9rem; color: #aaa; }
+    code { background: #2c2c2c; padding: 0.2rem 0.4rem; border-radius: 4px; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Nitan MCP Auth</h1>
+    <div class="status ${isAuthenticated ? "auth" : "no-auth"}">
+      ${isAuthenticated ? "\\u2713 Authenticated" : "\\u2717 Not Authenticated"}
+    </div>
+
+    ${
+      !isAuthenticated
+        ? `
+      <p>Target site: <code>${config.site}</code></p>
+      <p>Authorize in the new tab, then copy the encrypted payload shown by Discourse and paste it below.</p>
+      <a href="${authUrl}" target="_blank" class="btn">Authorize on Discourse</a>
+      <form id="callbackForm">
+        <label for="payload">Paste authorization payload here:</label>
+        <textarea id="payload" placeholder="Copy the full payload from the Discourse page and paste here..." required></textarea>
+        <button type="submit" class="btn">Connect</button>
+      </form>
+    `
+        : `
+      <p>You are authenticated to <code>${config.site}</code></p>
+      <button id="logoutBtn" class="btn btn-red">Logout</button>
+    `
+    }
+
+    <script>
+      const callbackForm = document.getElementById("callbackForm");
+      if (callbackForm) {
+        callbackForm.onsubmit = async (e) => {
+          e.preventDefault();
+          const payload = document.getElementById("payload").value.trim();
+          if (!payload) return;
+          const res = await fetch("/auth/callback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ payload })
+          });
+          const data = await res.json();
+          alert(data.message || (data.status === "ok" ? "Success!" : "Error"));
+          if (data.status === "ok") location.reload();
+        };
+      }
+
+      const logoutBtn = document.getElementById("logoutBtn");
+      if (logoutBtn) {
+        logoutBtn.onclick = async () => {
+          if (!confirm("Logout from ${config.site}?")) return;
+          const res = await fetch("/auth/callback", { method: "DELETE" });
+          const data = await res.json();
+          alert(data.message);
+          location.reload();
+        };
+      }
+    </script>
+  </div>
+</body>
+</html>
+        `;
+        res.writeHead(200, { "Content-Type": "text/html" });
+        res.end(html);
+        return;
+      }
+
+      // Auth callback endpoint — handles GET (from Discourse) or POST (from auth page)
+      if (parsedUrl.pathname === "/auth/callback" && (req.method === "GET" || req.method === "POST")) {
+        const handlePayload = async (payload: string | null) => {
+          if (!payload) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ status: "error", message: "Missing payload parameter" }));
+            return;
+          }
+          if (!pendingAuthKeys) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ status: "error", message: "No pending authorization or already authorized" }));
+            return;
+          }
+          try {
+            const decrypted = decryptPayload(payload, pendingAuthKeys.privateKey);
+            const result = JSON.parse(decrypted);
+            if (!result.key) {
+              throw new Error("Invalid response: missing 'key' field");
+            }
+            await saveToProfile(resolvedProfilePath, config.site, result.key, pendingAuthKeys.clientId);
+            // 热更新内存中的 auth，无需重启
+            siteState.updateAuthOverride({
+              site: config.site,
+              user_api_key: result.key,
+              user_api_client_id: pendingAuthKeys.clientId,
+            });
+            siteState.selectSite(config.site);
+            logger.info(`Authorization successful — saved to ${resolvedProfilePath}`);
+            pendingAuthKeys = null;
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ status: "ok", message: "Authorization successful. Auth is now active." }));
+          } catch (error: any) {
+            logger.error(`Auth callback error: ${error?.message || String(error)}`);
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ status: "error", message: error?.message || "Failed to process authorization" }));
+          }
+        };
+
+        if (req.method === "GET") {
+          await handlePayload(parsedUrl.searchParams.get("payload"));
+        } else {
+          let body = "";
+          req.on("data", (chunk) => { body += chunk; });
+          req.on("end", async () => {
+            try {
+              const parsed = JSON.parse(body);
+              await handlePayload(parsed.payload);
+            } catch {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ status: "error", message: "Invalid JSON body" }));
+            }
+          });
+        }
+        return;
+      }
+
+      // Logout endpoint — removes auth for the current site from profile
+      if (req.method === "DELETE" && parsedUrl.pathname === "/auth/callback") {
+        try {
+          const profileTxt = await readFile(resolvedProfilePath, "utf8").catch(() => "{}");
+          const profile = JSON.parse(profileTxt);
+          if (profile.auth_pairs && Array.isArray(profile.auth_pairs)) {
+            profile.auth_pairs = profile.auth_pairs.filter((p: any) => p.site !== config.site);
+            await writeFile(resolvedProfilePath, JSON.stringify(profile, null, 2), "utf8");
+          }
+          const keyPair = generateKeyPair();
+          const nonce = Date.now().toString();
+          const clientId = generateClientId();
+          // 清除内存中的 auth
+          if (config.site) siteState.removeAuthOverride(config.site);
+          pendingAuthKeys = { publicKey: keyPair.publicKey, privateKey: keyPair.privateKey, nonce, clientId };
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ status: "ok", message: "Logged out" }));
+        } catch (error: any) {
+          logger.error(`Logout error: ${error?.message || String(error)}`);
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ status: "error", message: "Logout failed" }));
+        }
         return;
       }
 
       // MCP endpoint - handle via StreamableHTTPServerTransport
-      if (req.url === "/mcp" || req.url === "/") {
+      if (parsedUrl.pathname === "/mcp" || parsedUrl.pathname === "/") {
         let body = "";
         req.on("data", (chunk) => {
           body += chunk;
@@ -633,6 +847,9 @@ async function main() {
       logger.info(`HTTP transport listening on port ${config.port}`);
       logger.info(`Health check available at http://localhost:${config.port}/health`);
       logger.info(`MCP endpoint available at http://localhost:${config.port}/mcp`);
+      if (pendingAuthKeys) {
+        logger.info(`Auth page at http://localhost:${config.port}/auth`);
+      }
     });
 
     // Exit cleanly on SIGTERM/SIGINT

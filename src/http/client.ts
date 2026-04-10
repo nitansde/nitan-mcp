@@ -233,6 +233,11 @@ export class HttpClient {
         if (!res.ok) {
           const text = await safeText(res);
           const errorBody = safeJson(text);
+          const isChallenge = this.isCloudflareChallenge(res.status, text, responseHeaders);
+          if (isChallenge && this.browserFallbackClient?.isEnabled()) {
+            this.opts.logger.info(`Cloudflare challenge detected via native fetch (${res.status}), switching to browser fallback`);
+            return await this.tryBrowserFallback(method, url, headers, body);
+          }
           this.opts.logger.error(`HTTP ${res.status} ${res.statusText} for ${method} ${url}: ${text}`);
           throw new HttpError(res.status, `HTTP ${res.status} ${res.statusText}`, errorBody);
         }
@@ -333,7 +338,11 @@ export class HttpClient {
     this.opts.logger.info(`Attempting browser fallback for ${method} ${url}`);
     let response = await this.browserFallbackClient.request(browserRequest);
 
-    if (this.isLoginRequired(response.finalUrl, response.body)) {
+      if (this.isLoginRequired(response.finalUrl, response.body)) {
+        if (!this.opts.loginCredentials) {
+        throw new Error("Authentication required. Configure an API key or provide NITAN_USERNAME/NITAN_PASSWORD.");
+        }
+
       const autoLoginAttempted = await this.browserFallbackClient.maybeAutoLogin(this.base.toString());
       if (autoLoginAttempted) {
         this.opts.logger.info(`Retrying browser fallback once after auto-login for ${method} ${url}`);

@@ -56,7 +56,7 @@ export class SiteState {
     if (cached) return { base, client: cached };
 
     const auth = this.resolveAuthForSite(base);
-    const loginCreds = this.resolveLoginForSite(base);
+    const loginCreds = auth.type === "none" ? this.resolveLoginForSite(base) : undefined;
     
     // Determine bypass method (support legacy useCloudscraper option)
     let bypassMethod: BypassMethod | undefined = this.opts.bypassMethod;
@@ -84,6 +84,63 @@ export class SiteState {
     this.currentSiteBase = base;
     this.currentClient = client;
     return { base, client };
+  }
+
+  hasAuthForSite(siteUrl: string): boolean {
+    const base = normalizeBase(siteUrl);
+    return this.resolveAuthForSite(base).type !== "none";
+  }
+
+  hasLoginForSite(siteUrl: string): boolean {
+    const base = normalizeBase(siteUrl);
+    return Boolean(this.resolveLoginForSite(base));
+  }
+
+  hasAuthenticationConfiguredForSite(siteUrl: string): boolean {
+    return this.hasAuthForSite(siteUrl) || this.hasLoginForSite(siteUrl);
+  }
+
+  // 热更新 auth — 替换或追加指定 site 的认证信息，并清除缓存的 client
+  updateAuthOverride(override: AuthOverride): void {
+    if (!this.opts.authOverrides) this.opts.authOverrides = [];
+    const base = normalizeBase(override.site);
+    const idx = this.opts.authOverrides.findIndex(
+      (o) => normalizeBase(o.site) === base || this.sameOrigin(o.site, base)
+    );
+    if (idx >= 0) {
+      this.opts.authOverrides[idx] = override;
+    } else {
+      this.opts.authOverrides.push(override);
+    }
+    // 清除该 site 的缓存 client，下次 buildClientForSite 会用新 auth 重建
+    const cached = this.clientCache.get(base);
+    if (cached) {
+      cached.dispose().catch(() => {});
+      this.clientCache.delete(base);
+    }
+    // 如果当前选中的就是这个 site，也清掉让它重建
+    if (this.currentSiteBase === base) {
+      this.currentSiteBase = undefined;
+      this.currentClient = undefined;
+    }
+  }
+
+  // 移除指定 site 的认证信息并清除缓存
+  removeAuthOverride(siteUrl: string): void {
+    if (!this.opts.authOverrides) return;
+    const base = normalizeBase(siteUrl);
+    this.opts.authOverrides = this.opts.authOverrides.filter(
+      (o) => normalizeBase(o.site) !== base && !this.sameOrigin(o.site, base)
+    );
+    const cached = this.clientCache.get(base);
+    if (cached) {
+      cached.dispose().catch(() => {});
+      this.clientCache.delete(base);
+    }
+    if (this.currentSiteBase === base) {
+      this.currentSiteBase = undefined;
+      this.currentClient = undefined;
+    }
   }
 
   async dispose(): Promise<void> {

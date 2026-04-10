@@ -16,8 +16,6 @@
 - Supported auth:
   - **None** (read-only public data)
   - Per-site overrides via `--auth_pairs`, e.g. `[{"site":"https://example.com","api_key":"...","api_username":"system"}]`.
-- **Writes are disabled by default**. Write tools (`discourse_create_post`, `discourse_create_topic`, `discourse_create_category`, `discourse_create_user`) are only registered when all are true:
-  - `--allow_writes` AND not `--read_only` AND a matching `auth_pairs` entry exists for the selected site.
 - Secrets are never logged; config is redacted before logging.
 
 ### Tools exposed (built-in)
@@ -43,15 +41,6 @@
   - **Input**: `{ filter: string; page?: number; per_page?: number (1–50) }`
   - **Output**: Paginated topic list with titles and URLs; appends a JSON footer `{ page, per_page, results: [{ id, url, title }], next_url? }`.
   - Query language: key:value tokens separated by spaces; category/categories (comma = OR, `=category` = without subcats, `-` exclude); tag/tags (comma = OR, `+` = AND) and tag_group; status:(open|closed|archived|listed|unlisted|public); personal `in:` (bookmarked|watching|tracking|muted|pinned); dates created/activity/latest-post-(before|after) as `YYYY-MM-DD` or `N` days; numeric likes[-op]-(min|max), posts-(min|max), posters-(min|max), views-(min|max); `order:` with optional `-asc`; free text terms allowed.
-- **discourse_create_post** (conditionally available; see permissions)
-  - **Input**: `{ topic_id: number; raw: string (≤ 30k chars) }`
-  - **Output**: Link to created post/topic. Includes a simple 1 req/sec rate limit.
-- **discourse_create_topic** (conditionally available; see permissions)
-  - **Input**: `{ title: string; raw: string (≤ 30k chars); category_id?: number; tags?: string[] }`
-  - **Output**: Link to created topic. Includes a simple 1 req/sec rate limit.
-- **discourse_create_category** (conditionally available; see permissions)
-  - **Input**: `{ name: string; color?: hex; text_color?: hex; parent_category_id?: number; description?: string }`
-  - **Output**: Link to created category. Includes a simple 1 req/sec rate limit.
 - **discourse_select_site** (hidden when `--site` is provided)
   - **Input**: `{ site: string }`
   - **Output**: Confirms selection; validates via `/about.json`. Triggers remote tool discovery when enabled.
@@ -67,7 +56,6 @@
 ### CLI configuration
 - **Optional flags**:
   - `--auth_pairs` (JSON)
-  - `--read_only` (default true), `--allow_writes` (default false)
   - `--timeout_ms <number>` (default 15000)
   - `--concurrency <number>` (default 4)
   - `--cache_dir <path>` (currently unused; in-memory caching is built-in)
@@ -85,7 +73,6 @@
 
 ### Errors & rate limits
 - Tool failures return `isError: true` with human-readable messages.
-- `discourse.create_post` and `discourse.create_category` enforce ~1 request/second to avoid flooding.
 
 ### Source map
 - MCP server and CLI: `src/index.ts`

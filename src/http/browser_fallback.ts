@@ -622,14 +622,50 @@ export class BrowserFallbackClient {
     return newPage;
   }
 
-  private async requestViaPlaywrightPage(page: any, input: BrowserRequest): Promise<BrowserResponse> {
-    const response = await page.goto(input.url, { waitUntil: "domcontentloaded", timeout: this.timeoutMs });
-    const content = await page.content();
-    const status = response?.status() ?? 0;
-    const headers = response?.headers?.() ?? {};
-    const finalUrl = page.url();
+  private async readPlaywrightGetBody(response: any, page: any): Promise<string> {
+    if (response && typeof response.text === "function") {
+      try {
+        return await response.text();
+      } catch {
+      }
+    }
 
-    if (input.method.toUpperCase() !== "GET") {
+    return await page.content();
+  }
+
+  private isChallengeLikeResponse(response: BrowserResponse): boolean {
+    const body = (response.body || "").toLowerCase();
+    const bodyHit =
+      body.includes("just a moment") ||
+      body.includes("attention required") ||
+      body.includes("/cdn-cgi/challenge-platform/") ||
+      body.includes("cf-challenge");
+    const statusHit = response.status === 403 || response.status === 429 || response.status === 503;
+    return Boolean((statusHit && bodyHit) || bodyHit);
+  }
+
+  private shouldRetryWithClearedManagedCookies(
+    profileSelection: BrowserProfileSelection,
+    input: BrowserRequest,
+    response: BrowserResponse
+  ): boolean {
+    return (
+      input.method.toUpperCase() === "GET" &&
+      profileSelection.source === "nitan" &&
+      !this.options.loginProfileName &&
+      this.isChallengeLikeResponse(response)
+    );
+  }
+
+  private async requestViaPlaywrightPage(page: any, input: BrowserRequest): Promise<BrowserResponse> {
+    const hasCustomHeaders = Boolean(input.headers && Object.keys(input.headers).length > 0);
+    if (input.method.toUpperCase() !== "GET" || hasCustomHeaders) {
+      const targetOrigin = new URL(input.url).origin;
+      const currentUrl = typeof page.url === "function" ? page.url() : "about:blank";
+      if (!currentUrl || currentUrl === "about:blank" || !currentUrl.startsWith(targetOrigin)) {
+        await page.goto(targetOrigin, { waitUntil: "domcontentloaded", timeout: this.timeoutMs });
+      }
+
       const payload = await page.evaluate(async (req: any) => {
         const fetchResp = await fetch(req.url, {
           method: req.method,
@@ -656,6 +692,12 @@ export class BrowserFallbackClient {
       });
       return payload;
     }
+
+    const response = await page.goto(input.url, { waitUntil: "domcontentloaded", timeout: this.timeoutMs });
+    const content = await this.readPlaywrightGetBody(response, page);
+    const status = response?.status() ?? 0;
+    const headers = response?.headers?.() ?? {};
+    const finalUrl = page.url();
 
     return {
       status,
@@ -760,7 +802,7 @@ export class BrowserFallbackClient {
       }
 
       const response = await page.goto(input.url, { waitUntil: "domcontentloaded", timeout: this.timeoutMs });
-      const content = await page.content();
+      const content = await this.readPlaywrightGetBody(response, page);
       const status = response?.status() ?? 0;
       const headers = response?.headers?.() ?? {};
       const finalUrl = page.url();
@@ -809,7 +851,15 @@ export class BrowserFallbackClient {
     try {
       const session = await this.getOrCreatePlaywrightSession(profileSelection);
       const page = await this.getOrCreatePlaywrightPage(session);
-      return await this.requestViaPlaywrightPage(page, input);
+      let response = await this.requestViaPlaywrightPage(page, input);
+      if (
+        this.shouldRetryWithClearedManagedCookies(profileSelection, input, response) &&
+        typeof session.context.clearCookies === "function"
+      ) {
+        await session.context.clearCookies();
+        response = await this.requestViaPlaywrightPage(page, input);
+      }
+      return response;
     } catch (e: any) {
       if (!this.isRetryablePlaywrightSessionError(e)) {
         throw e;
@@ -818,7 +868,15 @@ export class BrowserFallbackClient {
       await this.closePlaywrightSession();
       const freshSession = await this.getOrCreatePlaywrightSession(profileSelection);
       const freshPage = await this.getOrCreatePlaywrightPage(freshSession);
-      return await this.requestViaPlaywrightPage(freshPage, input);
+      let response = await this.requestViaPlaywrightPage(freshPage, input);
+      if (
+        this.shouldRetryWithClearedManagedCookies(profileSelection, input, response) &&
+        typeof freshSession.context.clearCookies === "function"
+      ) {
+        await freshSession.context.clearCookies();
+        response = await this.requestViaPlaywrightPage(freshPage, input);
+      }
+      return response;
     }
   }
 
