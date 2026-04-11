@@ -33,26 +33,17 @@ test('registers built-in tools', async () => {
 function expectedRegisteredToolNames(hideSelectSite = false) {
   const names = [
     'discourse_search',
-    '美卡_搜索',
     'discourse_read_topic',
-    '美卡_读帖',
     'discourse_get_user_activity',
-    '美卡_用户动态',
     'discourse_list_hot_topics',
-    '美卡_热帖',
     'discourse_list_notifications',
-    '美卡_通知',
     'discourse_list_top_topics',
-    '美卡_热榜',
     'discourse_list_excellent_topics',
-    '美卡_精华',
     'discourse_list_funny_topics',
-    '美卡_搞笑',
     'discourse_get_trust_level_progress',
-    '美卡_等级进度',
   ];
 
-  return hideSelectSite ? names : ['discourse_select_site', '美卡_选站', ...names];
+  return hideSelectSite ? names : ['discourse_select_site', ...names];
 }
 
 test('site state keeps login credentials available even when API auth exists', async () => {

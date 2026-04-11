@@ -18,7 +18,6 @@ This repo started from Discourse MCP, but the current project is opinionated for
   - `--site <url>` tethers the server to one site and hides `discourse_select_site`
   - `discourse_select_site` can select a site interactively when not tethered
   - site selection no longer pre-validates with `/about.json`
-- **Chinese aliases** are registered automatically for the currently exposed built-in tools.
 
 ### Authentication model
 Public read-only use is allowed, but some endpoints behave better or only work when authenticated.
@@ -97,7 +96,7 @@ When `--transport http` is used:
 The `/auth` page currently uses the **manual copy/paste payload flow** (no `auth_redirect`) because that is the path proven to work on uscardforum.com.
 
 ### Currently registered built-in tools
-The current runtime registers these built-in tools (plus Chinese aliases):
+The current runtime registers these built-in tools:
 
 - `discourse_select_site`
 - `discourse_search`
