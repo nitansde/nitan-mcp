@@ -59,7 +59,7 @@ Pending state stores the RSA private key, public key, site, nonce, client ID, an
 
 #### 3) Login credentials (alternative to API key)
 You can configure login credentials via:
-- env vars: `NITAN_USERNAME`, `NITAN_PASSWORD`, optional `DISCOURSE_2FA_TOKEN`
+- env vars: `NITAN_USERNAME`, `NITAN_PASSWORD`
 - or per-site `auth_pairs` entries with `username` / `password`
 
 ### Browser fallback / Cloudflare strategy
