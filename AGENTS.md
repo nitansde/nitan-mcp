@@ -41,21 +41,27 @@ Important behavior:
 ### Auth setup flows
 #### 1) API key setup (recommended)
 - Start interactive/manual flow:
-  - `nitan-mcp generate-user-api-key --site https://www.uscardforum.com --save-to /path/profile.json`
+  - `nitan-mcp generate-user-api-key --site https://www.uscardforum.com`
 - Choose launch behavior:
   - `--auth-mode url` → print URL only
   - `--auth-mode browser` → print URL and open browser automatically
 - Default client IDs are generated as `nitan-mcp-<uuid>`.
+- The profile is saved to a platform default location and loaded automatically by the server.
 
 #### 2) Resumable API key setup
 Useful for agent hosts that cannot keep the generator process open.
 
 - Start and persist pending state:
-  - `nitan-mcp generate-user-api-key --site https://www.uscardforum.com --state-file /tmp/nitan-user-api-key.json --save-to /path/profile.json`
+  - `nitan-mcp generate-user-api-key --site https://www.uscardforum.com --state-file /tmp/nitan-user-api-key.json`
 - Complete later in another process:
   - `nitan-mcp complete-user-api-key --state-file /tmp/nitan-user-api-key.json --payload "..."`
 
-Pending state stores the RSA private key, public key, site, nonce, client ID, and optional `saveTo`. On successful completion the CLI attempts to delete the state file.
+Pending state stores the RSA private key, public key, site, nonce, and client ID. On successful completion the CLI attempts to delete the state file.
+
+Default profile path:
+- macOS: `~/Library/Application Support/NitanMCP/profile.json`
+- Linux / Docker: `${XDG_CONFIG_HOME:-~/.config}/nitan-mcp/profile.json`
+- Windows: `%APPDATA%\NitanMCP\profile.json`
 
 #### 3) Login credentials (alternative to API key)
 You can configure login credentials via:
@@ -111,7 +117,6 @@ Notes:
 ### Key CLI/config fields that matter now
 Important runtime flags / profile fields:
 - `--site <url>`
-- `--profile <path.json>`
 - `--auth_pairs <json>`
 - `--transport stdio|http`
 - `--port <number>`
@@ -127,6 +132,9 @@ Important runtime flags / profile fields:
 - `--login_profile_name <name>`
 - `--login_wait_timeout_ms <number>`
 - `--login_check_url <url>`
+
+Delete the current default profile file with:
+- `nitan-mcp delete-user-api-key`
 
 ### Source map
 - CLI/server entrypoint: `src/index.ts`

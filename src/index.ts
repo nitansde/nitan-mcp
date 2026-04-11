@@ -22,6 +22,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import { generateUserApiKey, completeUserApiKeyFromState, parseGenerateUserApiKeyArgs, generateKeyPair, generateClientId, buildAuthorizationUrl, decryptPayload, saveToProfile } from "./user-api-key-generator.js";
+import { getDefaultProfilePath } from "./util/paths.js";
 
 // Read package version at runtime to avoid import-attributes incompatibility
 async function getPackageVersion(): Promise<string> {
@@ -142,6 +143,7 @@ function coerceValue(val: string): unknown {
 
 async function loadProfile(path?: string): Promise<Partial<Profile>> {
   if (!path) return {};
+  if (!existsSync(path)) return {};
   const txt = await readFile(path, "utf8");
   const raw = JSON.parse(txt);
   const parsed = ProfileSchema.partial().safeParse(raw);
@@ -466,12 +468,11 @@ async function main() {
     const { options, showHelp } = parseGenerateUserApiKeyArgs(args.slice(1));
     if (showHelp || !options.stateFile || !options.payload) {
       console.error(`
-Usage: nitan-mcp complete-user-api-key --state-file <file> --payload <payload> [--save-to <file>]
+Usage: nitan-mcp complete-user-api-key --state-file <file> --payload <payload>
 
 Options:
   --state-file <file>       Pending auth state file created by generate-user-api-key
   --payload <payload>       Encrypted payload copied from Discourse
-  --save-to <file>          Optional profile path override for the completed key
   --help, -h                Show this help message
 `);
       if (showHelp) return;
@@ -480,14 +481,26 @@ Options:
     await completeUserApiKeyFromState({
       stateFile: options.stateFile,
       payload: options.payload,
-      saveTo: options.saveTo,
     });
+    return;
+  }
+  if (args[0] === "delete-user-api-key") {
+    const profilePath = getDefaultProfilePath();
+    if (!existsSync(profilePath)) {
+      console.log(JSON.stringify({ success: true, deleted: false, profile: profilePath }, null, 2));
+      return;
+    }
+    await import("node:fs/promises").then(({ unlink }) => unlink(profilePath));
+    console.log(JSON.stringify({ success: true, deleted: true, profile: profilePath }, null, 2));
     return;
   }
 
   const argv = parseArgs(process.argv.slice(2));
-  const profilePath = (argv.profile as string | undefined) ?? undefined;
-  const profile = await loadProfile(profilePath).catch((e) => {
+  if (argv.profile !== undefined) {
+    throw new Error("--profile is no longer supported. The server now always loads the default internal profile location automatically.");
+  }
+  const resolvedProfilePath = getDefaultProfilePath();
+  const profile = await loadProfile(resolvedProfilePath).catch((e) => {
     throw new Error(`Failed to load profile: ${e?.message || String(e)}`);
   });
   const config = mergeConfig(profile, argv);
@@ -627,8 +640,6 @@ Options:
         pendingAuthKeys.publicKey
       );
     }
-
-    const resolvedProfilePath = profilePath || "profile.json";
 
     const httpServer = createServer(async (req, res) => {
       const parsedUrl = new URL(req.url || "/", `http://localhost:${config.port}`);

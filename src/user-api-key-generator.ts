@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { generateKeyPairSync, privateDecrypt, constants, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import { readFile, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
+import { getDefaultProfilePath } from "./util/paths.js";
 
 interface KeyPair {
   publicKey: string;
@@ -21,7 +22,6 @@ interface GenerateOptions {
   authMode?: AuthLaunchMode;
   stateFile?: string;
   payload?: string;
-  saveTo?: string;
 }
 
 export type AuthLaunchMode = "url" | "browser";
@@ -41,7 +41,6 @@ export interface PendingUserApiKeyState {
   nonce: string;
   publicKey: string;
   privateKey: string;
-  saveTo?: string;
 }
 
 export interface PreparedUserApiKeyGeneration {
@@ -117,9 +116,7 @@ export function parseGenerateUserApiKeyArgs(args: string[]): ParsedGenerateUserA
         i++;
         break;
       case "--save-to":
-        options.saveTo = next;
-        i++;
-        break;
+        throw new Error("--save-to is no longer supported. The API profile is always saved to the default internal profile location.");
       case "--help":
       case "-h":
         showHelp = true;
@@ -173,7 +170,6 @@ export function createPendingUserApiKeyState(options: GenerateOptions): PendingU
   const clientId = options.clientId || generateClientId();
   const nonce = options.nonce || Date.now().toString();
   const { publicKey, privateKey } = generateKeyPair();
-
   return {
     version: 1,
     createdAt: new Date().toISOString(),
@@ -184,7 +180,6 @@ export function createPendingUserApiKeyState(options: GenerateOptions): PendingU
     nonce,
     publicKey,
     privateKey,
-    saveTo: options.saveTo,
   };
 }
 
@@ -239,23 +234,14 @@ export function extractUserApiKeyFromPayload(state: PendingUserApiKeyState, payl
   };
 }
 
-export async function completeUserApiKeyFromState(options: { stateFile: string; payload: string; saveTo?: string }): Promise<void> {
+export async function completeUserApiKeyFromState(options: { stateFile: string; payload: string }): Promise<void> {
   const state = await loadPendingUserApiKeyState(options.stateFile);
   const result = extractUserApiKeyFromPayload(state, options.payload);
-  const saveTo = options.saveTo || state.saveTo;
+  const saveTo = getDefaultProfilePath();
 
-  if (saveTo) {
-    await saveToProfile(saveTo, result.site, result.key, result.clientId);
-    console.error(`✓ Saved to profile: ${saveTo}\n`);
-    console.log(JSON.stringify({ success: true, profile: saveTo }, null, 2));
-  } else {
-    console.error("Add this to your auth_pairs configuration:\n");
-    console.log(JSON.stringify({
-      site: result.site,
-      user_api_key: result.key,
-      user_api_client_id: result.clientId,
-    }, null, 2));
-  }
+  await saveToProfile(saveTo, result.site, result.key, result.clientId);
+  console.error(`✓ Saved to profile: ${saveTo}\n`);
+  console.log(JSON.stringify({ success: true, profile: saveTo }, null, 2));
 
   await unlink(options.stateFile).catch(() => undefined);
 }
@@ -298,6 +284,8 @@ export async function saveToProfile(
 ): Promise<void> {
   let profile: any = {};
 
+  await mkdir(dirname(profilePath), { recursive: true }).catch(() => undefined);
+
   try {
     const content = await readFile(profilePath, "utf8");
     profile = JSON.parse(content);
@@ -336,15 +324,11 @@ Options:
   --auth-mode <mode>        How to start authorization: url or browser (default: url)
   --state-file <file>       Persist pending auth state and exit so another process can complete later
   --payload <payload>       Encrypted payload (skip interactive prompt)
-  --save-to <file>          Save to profile file instead of printing
   --help, -h                Show this help message
 
 Examples:
-  # Interactive mode
+  # Interactive mode (saves to the platform default profile path)
   nitan-mcp generate-user-api-key --site https://discourse.example.com
-
-  # Save to profile
-  nitan-mcp generate-user-api-key --site https://discourse.example.com --save-to profile.json
 
   # Start a resumable flow
   nitan-mcp generate-user-api-key --site https://discourse.example.com --state-file /tmp/nitan-user-api-key.json
@@ -424,19 +408,10 @@ Examples:
   console.error("✓ User API Key retrieved successfully\n");
 
   // Step 5: Output or save
-  if (options.saveTo) {
-    await saveToProfile(options.saveTo, options.site, result.key, result.clientId);
-    console.error(`✓ Saved to profile: ${options.saveTo}\n`);
-    console.log(JSON.stringify({ success: true, profile: options.saveTo }, null, 2));
-  } else {
-    console.error("Add this to your auth_pairs configuration:\n");
-    console.log(JSON.stringify({
-      site: options.site,
-      user_api_key: result.key,
-      user_api_client_id: result.clientId,
-    }, null, 2));
-    console.error("\nOr use --save-to <profile.json> to save automatically.");
-  }
+    const saveTo = getDefaultProfilePath();
+    await saveToProfile(saveTo, options.site, result.key, result.clientId);
+    console.error(`✓ Saved to profile: ${saveTo}\n`);
+    console.log(JSON.stringify({ success: true, profile: saveTo }, null, 2));
 }
 
 async function main() {

@@ -213,8 +213,7 @@ Using the published package:
 ```bash
 npx -y @nitansde/mcp@latest generate-user-api-key \
   --site https://www.uscardforum.com \
-  --auth-mode url \
-  --save-to /absolute/path/nitan-profile.json
+  --auth-mode url
 ```
 
 Using a local checkout after `npm run build`:
@@ -222,8 +221,7 @@ Using a local checkout after `npm run build`:
 ```bash
 node dist/index.js generate-user-api-key \
   --site https://www.uscardforum.com \
-  --auth-mode url \
-  --save-to /absolute/path/nitan-profile.json
+  --auth-mode url
 ```
 
 Authorization launch modes:
@@ -241,8 +239,7 @@ If your MCP host launches a short-lived process that cannot wait for the user to
 npx -y @nitansde/mcp@latest generate-user-api-key \
   --site https://www.uscardforum.com \
   --auth-mode browser \
-  --state-file /absolute/path/nitan-user-api-key.json \
-  --save-to /absolute/path/nitan-profile.json
+  --state-file /absolute/path/nitan-user-api-key.json
 ```
 
 This command:
@@ -263,13 +260,21 @@ npx -y @nitansde/mcp@latest complete-user-api-key \
 
 `complete-user-api-key` decrypts the payload using the saved pending state, writes the final `user_api_key` to the profile, and removes the state file on success.
 
+#### Default profile location
+
+The CLI saves the API profile to a platform default location automatically:
+
+- macOS: `~/Library/Application Support/NitanMCP/profile.json`
+- Linux / Docker: `${XDG_CONFIG_HOME:-~/.config}/nitan-mcp/profile.json`
+- Windows: `%APPDATA%\NitanMCP\profile.json`
+
 Browser-launch example:
 
 ```bash
 npx -y @nitansde/mcp@latest generate-user-api-key \
   --site https://www.uscardforum.com \
   --auth-mode browser \
-  --save-to /absolute/path/nitan-profile.json
+  --state-file /absolute/path/nitan-user-api-key.json
 ```
 
 What happens:
@@ -301,7 +306,7 @@ If you do not pass `--client-id`, the generator creates a unique `nitan-mcp-<uui
 
 #### Use the saved API key in your MCP client
 
-Point the server at the saved profile file with `--profile`.
+The server loads the default profile location automatically. No extra path flag is needed.
 
 **For Claude Desktop (macOS/Windows):**
 ```json
@@ -311,9 +316,7 @@ Point the server at the saved profile file with `--profile`.
       "command": "npx",
       "args": [
         "-y",
-        "@nitansde/mcp@latest",
-        "--profile",
-        "/absolute/path/nitan-profile.json"
+        "@nitansde/mcp@latest"
       ],
       "env": {
         "TIMEZONE": "America/New_York"
@@ -324,6 +327,14 @@ Point the server at the saved profile file with `--profile`.
 ```
 
 If an API key exists for the selected site, the server uses that first.
+
+#### Delete the current saved API key file
+
+To remove the current default saved API profile file entirely:
+
+```bash
+npx -y @nitansde/mcp@latest delete-user-api-key
+```
 
 ### Login via environment variables (alternative to API key)
 

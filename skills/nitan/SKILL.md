@@ -65,8 +65,7 @@ Step 1 — generate URL and persist pending state:
 npx --no-install nitan-mcp generate-user-api-key \
   --site https://www.uscardforum.com \
   --auth-mode url \
-  --state-file /absolute/path/nitan-user-api-key.json \
-  --save-to /absolute/path/nitan-profile.json
+  --state-file /absolute/path/nitan-user-api-key.json
 ```
 
 Agent behavior for step 1:
@@ -85,9 +84,9 @@ npx --no-install nitan-mcp complete-user-api-key \
 Important:
 - These commands assume `nitan-mcp` is already installed and available to `npx --no-install`.
 - If the user explicitly opts into install-on-demand mode, substitute a pinned package form such as `npx -y @nitansde/mcp@<pinned-version> ...`.
-- The saved profile file must be loaded by the actual MCP server launch using `--profile /absolute/path/nitan-profile.json`.
-- The shell wrappers in this skill do not inject `--profile` automatically.
-- If the user already has host-side MCP config, guide them to add `--profile` there instead of asking them to paste key material manually into config.
+- The key is always saved to the platform default profile location automatically.
+- The MCP server auto-loads that default profile path, so wrappers can use it without adding any profile-path flag.
+- If the user wants to clear the saved API key file later, use `npx --no-install nitan-mcp delete-user-api-key`.
 
 #### Option 2: Password env
 

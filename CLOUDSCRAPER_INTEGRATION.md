@@ -66,17 +66,11 @@ pip3 install cloudscraper
 # 2. Build the project
 pnpm build
 
-# 3. Create a profile
-cat > cloudscraper.json <<EOF
-{
-  "use_cloudscraper": true,
-  "site": "https://www.uscardforum.com/",
-  "log_level": "debug"
-}
-EOF
-
-# 4. Run
-node dist/index.js --profile cloudscraper.json
+# 3. Run
+node dist/index.js \
+  --use_cloudscraper true \
+  --site https://www.uscardforum.com/ \
+  --log_level debug
 ```
 
 ## Configuration Options
