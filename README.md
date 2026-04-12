@@ -78,7 +78,7 @@ npx -y @nitansde/mcp@latest
 
 **If Python dependencies aren't installed automatically:**
 ```bash
-.venv/bin/python -m pip install cloudscraper curl-cffi
+.venv/bin/python -m pip install cloudscraper curl-cffi nodriver
 # Or install from requirements.txt (recommended)
 .venv/bin/python -m pip install -r requirements.txt
 ```
@@ -135,10 +135,11 @@ Publish flow:
 
 ### Cloudflare Bypass
 
-This server uses an intelligent **dual-method Cloudflare bypass strategy**:
+This server uses an intelligent **multi-layer Cloudflare bypass strategy**:
 1. Tries `cloudscraper` first (mature, established)
 2. Automatically falls back to `curl_cffi` if cloudscraper fails (better browser impersonation)
-3. Remembers failures and uses the working method for subsequent requests
+3. On CF 403, launches `nodriver` (headless Chrome) to solve the challenge and harvest cookies, then retries via `curl_cffi`
+4. Remembers failures and uses the working method for subsequent requests
 
 This provides maximum reliability against Cloudflare protection. See [CLOUDFLARE_BYPASS.md](CLOUDFLARE_BYPASS.md) for details.
 

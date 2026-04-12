@@ -12,11 +12,14 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && npm run copy:python",
     "skill:pack": "bash scripts/package-skill.sh",
-    "copy:python": "mkdir -p dist/http && cp src/http/cloudscraper_wrapper.py dist/http/ && cp src/http/curl_cffi_wrapper.py dist/http/ && cp requirements.txt dist/",
+    "copy:python": "node -e \"const fs=require('fs'),p=require('path');fs.mkdirSync(p.join('dist','http'),{recursive:true});for(const f of['cloudscraper_wrapper.py','curl_cffi_wrapper.py','nodriver_cf_cookie.py'])fs.copyFileSync(p.join('src','http',f),p.join('dist','http',f));fs.copyFileSync('requirements.txt',p.join('dist','requirements.txt'))\"",
     "postinstall": "node scripts/check-python-deps.mjs",
     "prepublishOnly": "pnpm run build",
     "dev": "node --enable-source-maps dist/index.js",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
     "typecheck": "tsc --noEmit",
+    "check": "tsc --noEmit && eslint src/",
     "clean": "rm -rf dist",
     "sync:fixtures": "node scripts/sync-fixtures.mjs",
     "test": "node --test dist/test/**/*.js",
@@ -44,9 +47,12 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^20.14.10",
+    "eslint": "^10.1.0",
     "standard-version": "^9.5.0",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "typescript-eslint": "^8.57.2"
   },
   "packageManager": "pnpm@10.14.0"
 }
