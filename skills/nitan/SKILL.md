@@ -1,6 +1,6 @@
 ---
 name: nitan
-description: Use the local Nitan MCP stdio server for uscardforum.com search, reading, and monitoring workflows. Secure-by-default wrappers use npx --no-install with a preinstalled nitan-mcp binary; enable runtime npm install only with explicit opt-in.
+description: Use the local Nitan MCP stdio server for uscardforum.com search, reading, monitoring, and auth setup guidance. Secure-by-default wrappers use npx --no-install with a preinstalled nitan-mcp binary; enable runtime npm install only with explicit opt-in.
 metadata: {"openclaw":{"homepage":"https://github.com/nitansde/nitan-mcp","requires":{"bins":["npx","nitan-mcp"],"anyBins":["python3","python","py"]},"install":[{"id":"node","kind":"node","package":"@nitansde/mcp","bins":["nitan-mcp"],"label":"Install Nitan MCP CLI (npm)"}]},"nitan":{"runnerDefault":"npx --no-install nitan-mcp","runnerOptIn":"npx -y @nitansde/mcp@<version> (requires NITAN_MCP_ALLOW_INSTALL=1)","env":{"required":[],"optional":["NITAN_MCP_PACKAGE","NITAN_MCP_ALLOW_INSTALL","NITAN_MCP_RESPONSE_TIMEOUT","NITAN_USERNAME","NITAN_PASSWORD","TIMEZONE"]}}}
 ---
 
@@ -45,9 +45,67 @@ Use this skill as a thin bridge to the existing local MCP server. Do not reimple
 
 ## Authentication behavior
 
-- `NITAN_USERNAME` and `NITAN_PASSWORD` are optional for public read-only usage.
-- `discourse_list_notifications` requires login.
-- If the server returns login errors (`not_logged_in` / 403), ask the user to configure env credentials in MCP config (not in chat).
+Use this initial auth wizard whenever the user wants notifications/private content, or whenever an auth-required tool fails due to missing authentication.
+
+### Initial auth wizard
+
+Ask the user to choose one of these paths:
+
+1. **API key** (recommended)
+2. **Password env**
+3. **Public read-only only**
+
+#### Option 1: API key (recommended)
+
+Use the resumable 2-step CLI flow so the agent can print a URL now and complete later after the user returns with the payload.
+
+Step 1 — generate URL and persist pending state:
+
+```bash
+npx --no-install nitan-mcp generate-user-api-key \
+  --site https://www.uscardforum.com \
+  --auth-mode url \
+  --state-file /absolute/path/nitan-user-api-key.json
+```
+
+Agent behavior for step 1:
+- run the command
+- show the printed authorization URL to the user
+- tell the user to open it, log in, authorize, and copy the encrypted payload shown by Discourse
+
+Step 2 — complete later with the returned payload:
+
+```bash
+npx --no-install nitan-mcp complete-user-api-key \
+  --state-file /absolute/path/nitan-user-api-key.json \
+  --payload "PASTE_THE_ENCRYPTED_PAYLOAD_HERE"
+```
+
+Important:
+- These commands assume `nitan-mcp` is already installed and available to `npx --no-install`.
+- If the user explicitly opts into install-on-demand mode, substitute a pinned package form such as `npx -y @nitansde/mcp@<pinned-version> ...`.
+- The key is always saved to the platform default profile location automatically.
+- The MCP server auto-loads that default profile path, so wrappers can use it without adding any profile-path flag.
+- If the user wants to clear the saved API key file later, use `npx --no-install nitan-mcp delete-user-api-key`.
+
+#### Option 2: Password env
+
+Tell the user to configure these in their MCP client/server environment (not in chat):
+- `NITAN_USERNAME`
+- `NITAN_PASSWORD`
+
+Use this path when the user prefers login-based access instead of API key setup.
+
+#### Option 3: Public read-only only
+
+If the user does not want to configure auth yet:
+- continue with public read-only tools only
+- explain that notifications/private content will remain unavailable until they choose API key or password env setup
+
+General wizard rules:
+- Do not ask the user to paste forum passwords into chat.
+- Prefer API key setup when the user is okay with it.
+- If the user already chose one auth mode, do not push the other unless their chosen mode fails.
 - Optional: user can set `TIMEZONE` env if they want localized timestamps.
 
 ## Tool usage map
@@ -68,6 +126,7 @@ This skill includes `scripts/*.sh` wrappers that match the tools exposed in the 
   - `scripts/discourse_list_top_topics.sh [json_args]`
   - `scripts/discourse_list_excellent_topics.sh [json_args]`
   - `scripts/discourse_list_funny_topics.sh [json_args]`
+  - `scripts/discourse_get_trust_level_progress.sh [json_args]`
 
 Example:
 
@@ -120,7 +179,11 @@ Notes:
 - `discourse_list_notifications`
   - Use for user notifications.
   - Common params: `limit`, `unread_only`.
-  - Login required.
+  - Requires configured authentication (API key or login credentials).
+
+- `discourse_get_trust_level_progress`
+  - Use to inspect a user's current trust level and next-level progress.
+  - Common params: `username`.
 
 ## Tool-call workflow guidance
 
@@ -128,6 +191,7 @@ Notes:
 - For monitoring tasks: use list/ranking/activity tools first, then read specific topics for detail.
 - When a tool returns JSON text, parse it carefully and preserve URLs/topic IDs in your response.
 - If a requested tool is unavailable in the runtime, explain clearly and offer the closest supported path.
+- If an auth-required tool fails because auth is missing, switch into the initial auth wizard instead of repeatedly retrying the same tool.
 
 ## ClawHub compliance and security checklist
 

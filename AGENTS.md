@@ -1,88 +1,165 @@
-## Discourse MCP — Agent Guide
+## Nitan MCP — Agent Guide
 
-### What this is
-- **Purpose**: An MCP (Model Context Protocol) stdio server that exposes Discourse forum capabilities as tools for AI agents.
-- **Entry point**: `src/index.ts` → compiled to `dist/index.js` (binary name: `discourse-mcp`).
-- **SDK**: `@modelcontextprotocol/sdk`. Node ≥ 18.
+### What this project is
+- **Purpose**: a dedicated MCP server/CLI for **https://www.uscardforum.com/** with Cloudflare-aware request handling.
+- **Package / bin**: `@nitansde/mcp` → `nitan-mcp`
+- **Entry point**: `src/index.ts` → `dist/index.js`
+- **Runtime**: Node.js 18+, `@modelcontextprotocol/sdk`, Zod
+- **Default site**: `https://www.uscardforum.com/`
 
-### How it works
-- On start, the server validates CLI flags via Zod, constructs a dynamic site state, and registers tools on an MCP server named `@discourse/mcp`.
-- Choose a target Discourse site by either:
-  - Calling the `discourse_select_site` tool (validates via `/about.json`), or
-  - Starting with `--site <url>` to tether to a single site (validates via `/about.json` and hides `discourse_select_site`).
-- Outputs are text-oriented; some tools embed compact JSON in fenced code blocks for structured extraction.
+This repo started from Discourse MCP, but the current project is opinionated for uscardforum.com and should be documented and operated as such.
 
-### Authentication & permissions
-- Supported auth:
-  - **None** (read-only public data)
-  - Per-site overrides via `--auth_pairs`, e.g. `[{"site":"https://example.com","api_key":"...","api_username":"system"}]`.
-- Secrets are never logged; config is redacted before logging.
+### Current runtime model
+- **Built-in tools only**. Remote `/ai/tools` discovery/execution has been removed.
+- **Transport**:
+  - `stdio` (default)
+  - `http` (optional)
+- **Site selection**:
+  - `--site <url>` tethers the server to one site and hides `discourse_select_site`
+  - `discourse_select_site` can select a site interactively when not tethered
+  - site selection no longer pre-validates with `/about.json`
 
-### Tools exposed (built-in)
-- **discourse_search**
-  - **Input**: `{ query: string; with_private?: boolean; max_results?: number (1–50, default 10) }`
-  - **Output**: Top topics with titles and URLs; appends a JSON footer of `{ results: [{ id, url, title }] }` inside a fenced block.
-- **discourse_read_topic**
-  - **Input**: `{ topic_id: number; post_limit?: number (1–20, default 5); start_post_number?: number }`
-  - **Output**: Title, category, tags, and the first N posts (raw preferred when available) up to the configured max read length per post; includes canonical topic link.
-- **discourse_read_post**
-  - **Input**: `{ post_id: number }`
-  - **Output**: Author, timestamp, content (raw preferred) truncated to the configured max read length, and a direct link.
-- **discourse_list_categories**
-  - **Input**: `{}`
-  - **Output**: Category names with topic counts.
-- **discourse_list_tags**
-  - **Input**: `{}`
-  - **Output**: Tags with usage counts (or notice if tags are disabled).
-- **discourse_get_user**
-  - **Input**: `{ username: string }`
-  - **Output**: Display name, trust level, joined date, short bio, and profile link.
-- **discourse_filter_topics**
-  - **Input**: `{ filter: string; page?: number; per_page?: number (1–50) }`
-  - **Output**: Paginated topic list with titles and URLs; appends a JSON footer `{ page, per_page, results: [{ id, url, title }], next_url? }`.
-  - Query language: key:value tokens separated by spaces; category/categories (comma = OR, `=category` = without subcats, `-` exclude); tag/tags (comma = OR, `+` = AND) and tag_group; status:(open|closed|archived|listed|unlisted|public); personal `in:` (bookmarked|watching|tracking|muted|pinned); dates created/activity/latest-post-(before|after) as `YYYY-MM-DD` or `N` days; numeric likes[-op]-(min|max), posts-(min|max), posters-(min|max), views-(min|max); `order:` with optional `-asc`; free text terms allowed.
-- **discourse_select_site** (hidden when `--site` is provided)
-  - **Input**: `{ site: string }`
-  - **Output**: Confirms selection; validates via `/about.json`. Triggers remote tool discovery when enabled.
+### Authentication model
+Public read-only use is allowed, but some endpoints behave better or only work when authenticated.
 
-### Remote Tool Execution API (optional)
-- If the target Discourse site exposes an MCP-compatible Tool Execution API:
-  - GET `/ai/tools` is discovered after selecting a site when `tools_mode` is `auto` (default) or `tool_exec_api` (or immediately at startup if `--site` is provided).
-  - Each remote tool is registered dynamically using its JSON Schema input.
-  - Calls POST `/ai/tools/{name}/call` with `{ arguments, context: {} }`.
-  - Results may include `details.artifacts[]`; links are surfaced at the end of the tool output.
-- Set `--tools_mode=discourse_api_only` to disable remote tool discovery.
+Current preference order:
+1. **API key first**
+   - If a site has `user_api_key` / `user_api_client_id` in `auth_pairs`, that auth is used.
+2. **Login credentials second**
+   - If no API key exists but login credentials are configured, login-based bypass/browser recovery can use them.
+3. **Neither configured**
+   - Public tools may still work.
+   - Auth-required tools should prompt the user to configure an API key or `NITAN_USERNAME` / `NITAN_PASSWORD`.
 
-### CLI configuration
-- **Optional flags**:
-  - `--auth_pairs` (JSON)
-  - `--timeout_ms <number>` (default 15000)
-  - `--concurrency <number>` (default 4)
-  - `--cache_dir <path>` (currently unused; in-memory caching is built-in)
-  - `--log_level <silent|error|info|debug>` (default info)
-  - `--tools_mode <auto|discourse_api_only|tool_exec_api>` (default auto)
-  - `--profile <path.json>`: load partial config from JSON (flags override)
-  - `--site <url>`: tether to a single site (hides `discourse_select_site`)
-  - `--default-search <prefix>`: unconditionally prefix every search query (e.g., `category:support tag:ai`)
-  - `--max-read-length <number>` (default 50000): maximum number of characters returned for post content in `discourse_read_post` and per-post content in `discourse_read_topic`. Tools prefer `raw` content via Discourse API (`include_raw=true`) when available.
+Important behavior:
+- API auth and login creds can both be attached to the same site client.
+- API headers remain primary on requests.
+- Login credentials remain available for bypass/browser rescue paths.
+- Browser fallback is a **rescue path**, not the primary auth mode.
 
-### Networking & resilience
-- User-Agent: `Discourse-MCP/0.x (+https://github.com/discourse-mcp)`.
-- Retries on 429/5xx with backoff (3 attempts).
-- Lightweight in-memory GET cache for selected endpoints (e.g., topics, site metadata).
+### Auth setup flows
+#### 1) API key setup (recommended)
+- Start interactive/manual flow:
+  - `nitan-mcp generate-user-api-key --site https://www.uscardforum.com`
+- Choose launch behavior:
+  - `--auth-mode url` → print URL only
+  - `--auth-mode browser` → print URL and open browser automatically
+- Default client IDs are generated as `nitan-mcp-<uuid>`.
+- The profile is saved to a platform default location and loaded automatically by the server.
 
-### Errors & rate limits
-- Tool failures return `isError: true` with human-readable messages.
+#### 2) Resumable API key setup
+Useful for agent hosts that cannot keep the generator process open.
+
+- Start and persist pending state:
+  - `nitan-mcp generate-user-api-key --site https://www.uscardforum.com --state-file /tmp/nitan-user-api-key.json`
+- Complete later in another process:
+  - `nitan-mcp complete-user-api-key --state-file /tmp/nitan-user-api-key.json --payload "..."`
+
+Pending state stores the RSA private key, public key, site, nonce, and client ID. On successful completion the CLI attempts to delete the state file.
+
+Default profile path:
+- macOS: `~/Library/Application Support/NitanMCP/profile.json`
+- Linux / Docker: `${XDG_CONFIG_HOME:-~/.config}/nitan-mcp/profile.json`
+- Windows: `%APPDATA%\NitanMCP\profile.json`
+
+#### 3) Login credentials (alternative to API key)
+You can configure login credentials via:
+- env vars: `NITAN_USERNAME`, `NITAN_PASSWORD`
+- or per-site `auth_pairs` entries with `username` / `password`
+
+### Browser fallback / Cloudflare strategy
+- Direct request path prefers Python bypass helpers:
+  - `cloudscraper`
+  - `curl_cffi`
+- When direct paths hit Cloudflare challenge pages, browser fallback can take over.
+- On macOS, Playwright browser fallback is enabled by default.
+- Browser fallback preserves auth headers on GET requests that need them.
+- Native fetch challenge responses escalate into browser fallback.
+
+Login behavior inside browser fallback:
+- If a login page is reached and login credentials are configured, auto-login is attempted.
+- If not, the user may need to complete login manually in the browser.
+
+### HTTP transport endpoints
+When `--transport http` is used:
+- `GET /health`
+  - returns status, uptime, auth state, and auth page URL
+- `GET /auth`
+  - local auth page for the manual payload flow
+- `POST /auth/callback`
+  - accepts `{ payload }` JSON body
+- `GET /auth/callback?payload=...`
+  - accepts payload as query param
+- `DELETE /auth/callback`
+  - clears saved auth for the current site and regenerates pending auth state
+
+The `/auth` page currently uses the **manual copy/paste payload flow** (no `auth_redirect`) because that is the path proven to work on uscardforum.com.
+
+### Currently registered built-in tools
+The current runtime registers these built-in tools:
+
+- `discourse_select_site`
+- `discourse_search`
+- `discourse_read_topic`
+- `discourse_get_user_activity`
+- `discourse_list_hot_topics`
+- `discourse_list_notifications`
+- `discourse_list_top_topics`
+- `discourse_list_excellent_topics`
+- `discourse_list_funny_topics`
+- `discourse_get_trust_level_progress`
+
+Notes:
+- Write tools have been removed from this repo.
+- Some older builtin source files may still exist in `src/tools/builtin`, but if they are not registered in `src/tools/registry.ts`, they are not part of the active runtime surface.
+
+### Key CLI/config fields that matter now
+Important runtime flags / profile fields:
+- `--site <url>`
+- `--auth_pairs <json>`
+- `--transport stdio|http`
+- `--port <number>`
+- `--timeout_ms <number>`
+- `--default-search <prefix>`
+- `--max-read-length <number>`
+- `--python_path <path>`
+- `--bypass_method cloudscraper|curl_cffi|both`
+- `--browser_fallback_enabled <bool>`
+- `--browser_fallback_provider playwright|openclaw_proxy`
+- `--browser_fallback_timeout_ms <number>`
+- `--interactive_login_enabled <bool>`
+- `--login_profile_name <name>`
+- `--login_wait_timeout_ms <number>`
+- `--login_check_url <url>`
+
+Delete the current default profile file with:
+- `nitan-mcp delete-user-api-key`
 
 ### Source map
-- MCP server and CLI: `src/index.ts`
+- CLI/server entrypoint: `src/index.ts`
+- API key generator / resumable flow: `src/user-api-key-generator.ts`
+- Site/auth selection: `src/site/state.ts`
 - HTTP client: `src/http/client.ts`
-- Tool registry: `src/tools/registry.ts`
+- Browser fallback: `src/http/browser_fallback.ts`
+- Built-in tool registry: `src/tools/registry.ts`
 - Built-in tools: `src/tools/builtin/*`
-- Remote tools: `src/tools/remote/tool_exec_api.ts`
-- Logging/redaction: `src/util/logger.ts`, `src/util/redact.ts`
+- Tests:
+  - `src/test/tools.test.ts`
+  - `src/test/transport.test.ts`
+  - `src/test/user_api_key_generator.test.ts`
+  - browser fallback tests in `src/test/browser_fallback_*.test.ts`
 
-### Quick start (for human operators)
+### Operator quick start
 - Build: `pnpm build`
-- Run: `node dist/index.js`
-- Select site with `discourse_select_site` in your client
+- Test: `pnpm test`
+- Doctor: `node dist/index.js doctor`
+- Run stdio server: `node dist/index.js`
+- Run HTTP server: `node dist/index.js --transport http --port 3000`
+
+### Maintenance notes for future edits
+- If you change the registered tool set, update this file and `README.md` together.
+- If you change auth precedence, update:
+  - `src/site/state.ts`
+  - `src/http/client.ts`
+  - auth setup sections in `README.md`
+- If you reintroduce any remote tool execution feature, document it explicitly here; assume it is absent unless the current code says otherwise.

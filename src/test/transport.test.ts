@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { constants, publicEncrypt } from 'node:crypto';
+import { getDefaultProfilePath } from '../util/paths.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,7 +29,7 @@ async function waitForServer(port: number, maxAttempts = 10): Promise<boolean> {
   return false;
 }
 
-function spawnHttpServer(indexPath: string, port: number, options?: { extraArgs?: string[]; cwd?: string }) {
+function spawnHttpServer(indexPath: string, port: number, options?: { extraArgs?: string[]; cwd?: string; env?: NodeJS.ProcessEnv }) {
   return spawn('node', [
     indexPath,
     '--transport', 'http',
@@ -39,6 +40,7 @@ function spawnHttpServer(indexPath: string, port: number, options?: { extraArgs?
   ], {
     stdio: ['ignore', 'pipe', 'pipe'],
     cwd: options?.cwd,
+    env: { ...process.env, ...(options?.env || {}) },
   });
 }
 
@@ -83,8 +85,12 @@ test('HTTP transport starts on specified port', async () => {
 test('HTTP transport health endpoint returns ok', async () => {
   const port = await getFreePort();
   const indexPath = path.resolve(__dirname, '../../dist/index.js');
+  const workdir = createTempDir('nitan-health-no-profile-');
 
-  const serverProcess = spawnHttpServer(indexPath, port);
+  const serverProcess = spawnHttpServer(indexPath, port, {
+    cwd: workdir,
+    env: { HOME: workdir },
+  });
 
   try {
     const ready = await waitForServer(port);
@@ -101,6 +107,7 @@ test('HTTP transport health endpoint returns ok', async () => {
     assert.equal(data.auth_page, `http://localhost:${port}/auth`);
   } finally {
     await stopServer(serverProcess);
+    await rm(workdir, { recursive: true, force: true });
   }
 });
 
@@ -158,6 +165,7 @@ test('health adapts to forwarded host and auth page uses manual payload flow', a
   const workdir = createTempDir('nitan-auth-flow-');
   const serverProcess = spawnHttpServer(indexPath, port, {
     cwd: workdir,
+    env: { HOME: workdir },
     extraArgs: ['--site', 'https://www.uscardforum.com'],
   });
 
@@ -204,15 +212,18 @@ test('auth page shows authenticated state when profile already exists', async ()
   const port = await getFreePort();
   const indexPath = path.resolve(__dirname, '../../dist/index.js');
   const workdir = createTempDir('nitan-auth-profile-');
+  const profilePath = getDefaultProfilePath('darwin', { ...process.env, HOME: workdir }, workdir);
+  mkdirSync(path.dirname(profilePath), { recursive: true });
   writeFileSync(
-    path.join(workdir, 'profile.json'),
+    profilePath,
     JSON.stringify({ auth_pairs: [{ site: 'https://www.uscardforum.com', user_api_key: 'existing-key', user_api_client_id: 'client-1' }] }, null, 2),
     'utf8'
   );
 
   const serverProcess = spawnHttpServer(indexPath, port, {
     cwd: workdir,
-    extraArgs: ['--site', 'https://www.uscardforum.com', '--profile', 'profile.json'],
+    env: { HOME: workdir },
+    extraArgs: ['--site', 'https://www.uscardforum.com'],
   });
 
   try {
@@ -234,6 +245,37 @@ test('auth page shows authenticated state when profile already exists', async ()
   }
 });
 
+test('HTTP transport auto-loads the default profile path when --profile is omitted', async () => {
+  const port = await getFreePort();
+  const indexPath = path.resolve(__dirname, '../../dist/index.js');
+  const workdir = createTempDir('nitan-auth-default-autoload-');
+  const profilePath = getDefaultProfilePath('darwin', { ...process.env, HOME: workdir }, workdir);
+  mkdirSync(path.dirname(profilePath), { recursive: true });
+  writeFileSync(
+    profilePath,
+    JSON.stringify({ auth_pairs: [{ site: 'https://www.uscardforum.com', user_api_key: 'existing-key', user_api_client_id: 'client-1' }] }, null, 2),
+    'utf8'
+  );
+
+  const serverProcess = spawnHttpServer(indexPath, port, {
+    cwd: workdir,
+    env: { HOME: workdir },
+    extraArgs: ['--site', 'https://www.uscardforum.com'],
+  });
+
+  try {
+    const ready = await waitForServer(port);
+    assert.ok(ready, 'Server should start');
+
+    const healthResponse = await fetch(`http://localhost:${port}/health`);
+    const health = await healthResponse.json();
+    assert.equal(health.authenticated, true);
+  } finally {
+    await stopServer(serverProcess);
+    await rm(workdir, { recursive: true, force: true });
+  }
+});
+
 test('POST and GET auth callback process encrypted payloads and update health state', async () => {
   const indexPath = path.resolve(__dirname, '../../dist/index.js');
 
@@ -242,6 +284,7 @@ test('POST and GET auth callback process encrypted payloads and update health st
     const workdir = createTempDir(`nitan-auth-callback-${method.toLowerCase()}-`);
     const serverProcess = spawnHttpServer(indexPath, port, {
       cwd: workdir,
+      env: { HOME: workdir },
       extraArgs: ['--site', 'https://www.uscardforum.com'],
     });
 
@@ -269,7 +312,8 @@ test('POST and GET auth callback process encrypted payloads and update health st
       const health = await healthResponse.json();
       assert.equal(health.authenticated, true);
 
-      const savedProfile = JSON.parse(await readFile(path.join(workdir, 'profile.json'), 'utf8'));
+      const profilePath = getDefaultProfilePath('darwin', { ...process.env, HOME: workdir }, workdir);
+      const savedProfile = JSON.parse(await readFile(profilePath, 'utf8'));
       assert.equal(savedProfile.auth_pairs.length, 1);
       assert.equal(savedProfile.auth_pairs[0].site, 'https://www.uscardforum.com');
       assert.equal(savedProfile.auth_pairs[0].user_api_key, `user-key-${method.toLowerCase()}`);
@@ -281,19 +325,57 @@ test('POST and GET auth callback process encrypted payloads and update health st
   }
 });
 
+test('HTTP auth callback saves to the default profile path when --profile is omitted', async () => {
+  const port = await getFreePort();
+  const indexPath = path.resolve(__dirname, '../../dist/index.js');
+  const workdir = createTempDir('nitan-auth-default-profile-');
+  const serverProcess = spawnHttpServer(indexPath, port, {
+    cwd: workdir,
+    env: { HOME: workdir },
+    extraArgs: ['--site', 'https://www.uscardforum.com'],
+  });
+
+  try {
+    const ready = await waitForServer(port);
+    assert.ok(ready, 'Server should start');
+
+    const authResponse = await fetch(`http://localhost:${port}/auth`);
+    const authUrl = extractAuthUrl(await authResponse.text());
+    const encryptedPayload = encryptPayloadForAuthUrl(authUrl, { key: 'user-key-default-http' });
+
+    const callbackResponse = await fetch(`http://localhost:${port}/auth/callback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payload: encryptedPayload }),
+    });
+    assert.equal(callbackResponse.status, 200);
+
+    const profilePath = getDefaultProfilePath('darwin', { ...process.env, HOME: workdir }, workdir);
+    const savedProfile = JSON.parse(await readFile(profilePath, 'utf8'));
+    assert.equal(savedProfile.auth_pairs[0].user_api_key, 'user-key-default-http');
+    assert.match(String(savedProfile.auth_pairs[0].user_api_client_id), /^nitan-mcp-[0-9a-f-]{36}$/);
+  } finally {
+    await stopServer(serverProcess);
+    await rm(workdir, { recursive: true, force: true });
+  }
+});
+
 test('DELETE auth callback clears profile auth and returns server to unauthenticated state', async () => {
   const port = await getFreePort();
   const indexPath = path.resolve(__dirname, '../../dist/index.js');
   const workdir = createTempDir('nitan-auth-logout-');
+  const profilePath = getDefaultProfilePath('darwin', { ...process.env, HOME: workdir }, workdir);
+  mkdirSync(path.dirname(profilePath), { recursive: true });
   writeFileSync(
-    path.join(workdir, 'profile.json'),
+    profilePath,
     JSON.stringify({ auth_pairs: [{ site: 'https://www.uscardforum.com', user_api_key: 'existing-key', user_api_client_id: 'client-1' }] }, null, 2),
     'utf8'
   );
 
   const serverProcess = spawnHttpServer(indexPath, port, {
     cwd: workdir,
-    extraArgs: ['--site', 'https://www.uscardforum.com', '--profile', 'profile.json'],
+    env: { HOME: workdir },
+    extraArgs: ['--site', 'https://www.uscardforum.com'],
   });
 
   try {
@@ -306,7 +388,7 @@ test('DELETE auth callback clears profile auth and returns server to unauthentic
     assert.equal(logout.status, 'ok');
     assert.equal(logout.message, 'Logged out');
 
-    const savedProfile = JSON.parse(await readFile(path.join(workdir, 'profile.json'), 'utf8'));
+    const savedProfile = JSON.parse(await readFile(profilePath, 'utf8'));
     assert.deepEqual(savedProfile.auth_pairs, []);
 
     const healthResponse = await fetch(`http://localhost:${port}/health`);

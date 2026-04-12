@@ -13,5 +13,5 @@ export interface ToolContext {
 export type RegisterFn = (
   server: McpServer,
   ctx: ToolContext,
-  opts: { allowWrites?: boolean; toolsMode?: string }
+  opts: { allowWrites?: boolean }
 ) => void | Promise<void>;

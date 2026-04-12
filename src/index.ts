@@ -21,7 +21,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { generateUserApiKey, parseGenerateUserApiKeyArgs, generateKeyPair, generateClientId, buildAuthorizationUrl, decryptPayload, saveToProfile } from "./user-api-key-generator.js";
+import { generateUserApiKey, completeUserApiKeyFromState, parseGenerateUserApiKeyArgs, generateKeyPair, generateClientId, buildAuthorizationUrl, decryptPayload, saveToProfile } from "./user-api-key-generator.js";
+import { getDefaultProfilePath } from "./util/paths.js";
 
 // Read package version at runtime to avoid import-attributes incompatibility
 async function getPackageVersion(): Promise<string> {
@@ -43,8 +44,7 @@ import {
   resolveBrowserFallbackEnabled,
   resolveBrowserFallbackProvider,
 } from "./http/browser_fallback_defaults.js";
-import { registerAllTools, type ToolsMode } from "./tools/registry.js";
-import { tryRegisterRemoteTools } from "./tools/remote/tool_exec_api.js";
+import { registerAllTools } from "./tools/registry.js";
 import { SiteState, type AuthOverride } from "./site/state.js";
 
 const DEFAULT_TIMEOUT_MS = 15000;
@@ -72,7 +72,6 @@ const ProfileSchema = z
     concurrency: z.number().int().positive().optional().default(4),
     cache_dir: z.string().optional(),
     log_level: z.enum(["silent", "error", "info", "debug"]).optional().default("info"),
-    tools_mode: z.enum(["auto", "discourse_api_only", "tool_exec_api"]).optional().default("auto"),
     site: z.string().url().optional().default("https://www.uscardforum.com/").describe("Tether MCP to a single Discourse site; defaults to uscardforum.com"),
     default_search: z.string().optional().describe("Optional search prefix added to every search query (set via --default-search)"),
     max_read_length: z
@@ -144,6 +143,7 @@ function coerceValue(val: string): unknown {
 
 async function loadProfile(path?: string): Promise<Partial<Profile>> {
   if (!path) return {};
+  if (!existsSync(path)) return {};
   const txt = await readFile(path, "utf8");
   const raw = JSON.parse(txt);
   const parsed = ProfileSchema.partial().safeParse(raw);
@@ -211,7 +211,6 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
     concurrency: (flags.concurrency as number | undefined) ?? profile.concurrency ?? 4,
     cache_dir: ((flags.cache_dir ?? flags["cache-dir"]) as string | undefined) ?? profile.cache_dir,
     log_level: (((flags.log_level ?? flags["log-level"]) as LogLevel | undefined) ?? (profile.log_level as LogLevel | undefined) ?? "info") as LogLevel,
-    tools_mode: (((flags.tools_mode ?? flags["tools-mode"]) as ToolsMode | undefined) ?? (profile.tools_mode as ToolsMode | undefined) ?? "auto") as ToolsMode,
     site: site ?? "https://www.uscardforum.com/",
     default_search: (((flags.default_search ?? flags["default-search"]) as string | undefined) ?? profile.default_search) as string | undefined,
     max_read_length: (((flags.max_read_length ?? flags["max-read-length"]) as number | undefined) ?? profile.max_read_length ?? 50000) as number,
@@ -465,10 +464,43 @@ async function main() {
     await generateUserApiKey(options);
     return;
   }
+  if (args[0] === "complete-user-api-key") {
+    const { options, showHelp } = parseGenerateUserApiKeyArgs(args.slice(1));
+    if (showHelp || !options.stateFile || !options.payload) {
+      console.error(`
+Usage: nitan-mcp complete-user-api-key --state-file <file> --payload <payload>
+
+Options:
+  --state-file <file>       Pending auth state file created by generate-user-api-key
+  --payload <payload>       Encrypted payload copied from Discourse
+  --help, -h                Show this help message
+`);
+      if (showHelp) return;
+      process.exit(1);
+    }
+    await completeUserApiKeyFromState({
+      stateFile: options.stateFile,
+      payload: options.payload,
+    });
+    return;
+  }
+  if (args[0] === "delete-user-api-key") {
+    const profilePath = getDefaultProfilePath();
+    if (!existsSync(profilePath)) {
+      console.log(JSON.stringify({ success: true, deleted: false, profile: profilePath }, null, 2));
+      return;
+    }
+    await import("node:fs/promises").then(({ unlink }) => unlink(profilePath));
+    console.log(JSON.stringify({ success: true, deleted: true, profile: profilePath }, null, 2));
+    return;
+  }
 
   const argv = parseArgs(process.argv.slice(2));
-  const profilePath = (argv.profile as string | undefined) ?? undefined;
-  const profile = await loadProfile(profilePath).catch((e) => {
+  if (argv.profile !== undefined) {
+    throw new Error("--profile is no longer supported. The server now always loads the default internal profile location automatically.");
+  }
+  const resolvedProfilePath = getDefaultProfilePath();
+  const profile = await loadProfile(resolvedProfilePath).catch((e) => {
     throw new Error(`Failed to load profile: ${e?.message || String(e)}`);
   });
   const config = mergeConfig(profile, argv);
@@ -532,40 +564,22 @@ async function main() {
     }
   );
 
-  // If tethered to a site, validate and preselect it before registering tools,
-  // and trigger remote tool discovery when enabled.
   let hideSelectSite = false;
   if (config.site) {
     try {
-      const { base, client } = siteState.buildClientForSite(config.site);
-      if (!config.skip_site_validation) {
-        const about = (await client.get(`/about.json`)) as any;
-        const title = about?.about?.title || about?.title || base;
-        siteState.selectSite(base);
-        hideSelectSite = true;
-        logger.info(`Tethered to site: ${base} (${title})`);
-      } else {
-        siteState.selectSite(base);
-        hideSelectSite = true;
-        logger.info(`Tethered to site without validation: ${base}`);
-      }
+      const { base } = siteState.selectSite(config.site);
+      hideSelectSite = true;
+      logger.info(`Tethered to site: ${base}`);
     } catch (e: any) {
-      throw new Error(`Failed to validate --site ${config.site}: ${e?.message || String(e)}`);
+      throw new Error(`Failed to initialize --site ${config.site}: ${e?.message || String(e)}`);
     }
   }
 
   await registerAllTools(server as any, siteState, logger, {
-    toolsMode: config.tools_mode,
     hideSelectSite,
     defaultSearchPrefix: config.default_search,
     maxReadLength: config.max_read_length,
   });
-
-  // If tethered and remote tool discovery is enabled, discover now
-  // Skip for uscardforum.com as it doesn't have AI tools endpoint
-  if (config.site && config.tools_mode !== "discourse_api_only" && !config.site.includes("uscardforum.com")) {
-    await tryRegisterRemoteTools(server as any, siteState, logger);
-  }
 
   // Create transport based on configuration
   if (config.transport === "http") {
@@ -626,8 +640,6 @@ async function main() {
         pendingAuthKeys.publicKey
       );
     }
-
-    const resolvedProfilePath = profilePath || "profile.json";
 
     const httpServer = createServer(async (req, res) => {
       const parsedUrl = new URL(req.url || "/", `http://localhost:${config.port}`);
