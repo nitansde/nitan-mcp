@@ -231,6 +231,11 @@ export class HttpClient {
             this.opts.logger.info(`Cloudflare challenge detected via native fetch (${res.status}), switching to browser fallback`);
             return await this.tryBrowserFallback(method, url, headers, body);
           }
+          // Treat any 403 as potential Cloudflare block when browser fallback is available
+          if (res.status === 403 && this.browserFallbackClient?.isEnabled()) {
+            this.opts.logger.info(`HTTP 403 from native fetch, attempting browser fallback for ${method} ${url}`);
+            return await this.tryBrowserFallback(method, url, headers, body);
+          }
           this.opts.logger.error(`HTTP ${res.status} ${res.statusText} for ${method} ${url}: ${text}`);
           throw new HttpError(res.status, `HTTP ${res.status} ${res.statusText}`, errorBody);
         }
@@ -414,9 +419,11 @@ export class HttpClient {
         // Check for HTTP errors / Cloudflare challenge
         if (result.status && result.status >= 400) {
           const isChallenge = this.isCloudflareChallenge(result.status, result.body, result.headers);
-          if (isChallenge && this.browserFallbackClient?.isEnabled()) {
-            this.opts.logger.info(`Cloudflare challenge detected via cloudscraper (${result.status}), switching to browser fallback`);
-            return await this.tryBrowserFallback(method, url, headers, body);
+          if (isChallenge || result.status === 403) {
+            // Mark cloudscraper as failed so we fall through to curl_cffi
+            this.cloudscraperFailed = true;
+            this.opts.logger.info(`Cloudflare challenge/403 via cloudscraper (${result.status}), falling through to curl_cffi`);
+            throw new Error(`Cloudscraper blocked by Cloudflare (${result.status})`);
           }
 
           const errorBody = safeJson(result.body || "");
@@ -493,6 +500,12 @@ export class HttpClient {
           const isChallenge = this.isCloudflareChallenge(result.status, result.body, result.headers);
           if (isChallenge && this.browserFallbackClient?.isEnabled()) {
             this.opts.logger.info(`Cloudflare challenge detected via curl_cffi (${result.status}), switching to browser fallback`);
+            return await this.tryBrowserFallback(method, url, headers, body);
+          }
+
+          // Treat any 403 as potential Cloudflare block when browser fallback is available
+          if (result.status === 403 && this.browserFallbackClient?.isEnabled()) {
+            this.opts.logger.info(`HTTP 403 from curl_cffi, attempting browser fallback for ${method} ${url}`);
             return await this.tryBrowserFallback(method, url, headers, body);
           }
 
