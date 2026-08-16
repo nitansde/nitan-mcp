@@ -61,7 +61,7 @@ export const registerListNotifications: RegisterFn = (server, ctx) => {
     {
       title: "List Notifications",
       description: "Get user notifications from the forum. Requires either a User API key or configured login credentials.",
-      inputSchema: schema.shape,
+      inputSchema: schema,
     },
     async ({ limit = 30, unread_only = true }, _extra: any) => {
       try {

@@ -11,7 +11,7 @@ export const registerSelectSite: RegisterFn = (server, ctx, opts) => {
     {
       title: "Select Site",
       description: "Select a Discourse site for subsequent tool calls.",
-      inputSchema: schema.shape,
+      inputSchema: schema,
     },
     async ({ site }, _extra: any) => {
       try {

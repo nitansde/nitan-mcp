@@ -21,7 +21,7 @@ export const registerListExcellentTopics: RegisterFn = (server, ctx, _opts) => {
       title: "List Excellent Topics",
       description:
         "Get recent excellent topics from the forum. An excellent topic is a topic with over 50 likes. Returns the most recent topics that earned the '精彩的话题' (Excellent Topic) badge.",
-      inputSchema: schema.shape,
+      inputSchema: schema,
     },
     async ({ limit = 20 }, _extra: any) => {
       try {

@@ -8,7 +8,7 @@ export const registerListTags: RegisterFn = (server, ctx) => {
     {
       title: "List Tags",
       description: "List tags (if enabled).",
-      inputSchema: schema.shape,
+      inputSchema: schema,
     },
     async (_args, _extra: any) => {
       try {

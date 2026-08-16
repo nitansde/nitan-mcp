@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from "@modelcontextprotocol/server";
 import { Logger } from '../util/logger.js';
 import { registerAllTools } from '../tools/registry.js';
 import { SiteState } from '../site/state.js';

@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import type { Logger } from "../util/logger.js";
 import type { SiteState } from "../site/state.js";
 import { registerSearch } from "./builtin/search.js";
@@ -25,7 +25,7 @@ export interface RegistryOptions {
   defaultSearchPrefix?: string;
 }
 
-export async function registerAllTools(
+export function registerAllTools(
   server: McpServer,
   siteState: SiteState,
   logger: Logger,
