@@ -21,7 +21,7 @@ export const registerListFunnyTopics: RegisterFn = (server, ctx, _opts) => {
       title: "List Funny Topics",
       description:
         "Get recent funny topics from the forum. A funny topic is a topic that earned the '难绷的话题' (Funny Topic) badge.",
-      inputSchema: schema.shape,
+      inputSchema: schema,
     },
     async ({ limit = 20 }, _extra: any) => {
       try {

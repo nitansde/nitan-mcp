@@ -44,7 +44,7 @@ export const registerFilterTopics: RegisterFn = (server, ctx) => {
     {
       title: "Filter Topics",
       description,
-      inputSchema: schema.shape,
+      inputSchema: schema,
     },
     async ({ categories, filter = "", page = 0, per_page }, _extra: any) => {
       try {

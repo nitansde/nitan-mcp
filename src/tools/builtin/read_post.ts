@@ -11,7 +11,7 @@ export const registerReadPost: RegisterFn = (server, ctx) => {
     {
       title: "Read Post",
       description: "Read a specific post.",
-      inputSchema: schema.shape,
+      inputSchema: schema,
     },
     async ({ post_id }, _extra: any) => {
       try {

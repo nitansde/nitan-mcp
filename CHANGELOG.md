@@ -1,4 +1,31 @@
 Changelog
+
+### [3.0.0] — MCP SDK v2 / 2026-07-28 Stateless Protocol
+
+#### Breaking Changes
+
+* Upgrade `@modelcontextprotocol/sdk` v1 to the v2 split packages:
+  `@modelcontextprotocol/server` and `@modelcontextprotocol/node`.
+* Upgrade `zod` from v3 to v4 (`^4.2.0`), as required by the v2 SDK.
+* Minimum Node.js version raised from 18 to **20** (v2 SDK requirement).
+
+#### Features
+
+* HTTP transport now speaks the **2026-07-28 stateless** Streamable HTTP protocol
+  via `createMcpHandler` — no `initialize` handshake, no `Mcp-Session-Id`, fresh
+  server per request. Legacy 2025-era clients are still served transparently.
+* stdio transport upgraded to `serveStdio`, supporting both 2025-era and 2026-07-28
+  protocol negotiation on a single connection.
+* Tool registration updated from deprecated `.shape` raw schemas to Standard Schema
+  (`z.object(...)`) objects, as recommended by the v2 SDK.
+
+#### Unchanged
+
+* All Nitan-specific behavior: Cloudflare bypass, browser fallback,
+  Discourse/uscardforum tools, `/health`, `/auth` + OAuth/User API Key flow,
+  `doctor` CLI.
+* stdio remains the default transport for `npx` / Claude Desktop usage.
+
 ### [0.1.9](https://github.com/discourse/discourse-mcp/compare/v0.1.8...v0.1.9) (2025-10-20)
 
 #### Features

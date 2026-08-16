@@ -15,7 +15,7 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
     {
       title: "Read Topic",
       description: "Read a topic metadata and posts. Can optionally filter to show only posts from a specific user.",
-      inputSchema: schema.shape,
+      inputSchema: schema,
     },
     async ({ topic_id, post_limit = 90, start_post_number = 1, username_filter }, _extra: any) => {
       try {

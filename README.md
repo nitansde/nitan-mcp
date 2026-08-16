@@ -9,7 +9,7 @@ This is a heavy modified version of [Discourse MCP](https://github.com/discourse
 ### Quick Installation
 
 **Prerequisites:**
-- **Node.js 18 or higher** (required)
+- **Node.js 20 or higher** (required — MCP SDK v2 requires Node 20+)
 - Python 3.7+ (required for Cloudflare bypass)
 - pip (used via local `.venv` Python)
 
@@ -52,14 +52,14 @@ node dist/index.js doctor
 
 **Check your Node.js version:**
 ```bash
-node --version  # Should be v18.0.0 or higher
+node --version  # Should be v20.0.0 or higher
 ```
 
 **If you need to upgrade Node.js:**
 ```bash
 # Using nvm (recommended)
-nvm install 18
-nvm use 18
+nvm install 20
+nvm use 20
 
 # Or download from https://nodejs.org/
 ```
@@ -375,6 +375,30 @@ Use optional env `"TIMEZONE": "America/New_York"` if you want a timezone differe
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 ```
 
+
+### HTTP Transport (MCP 2.0 / 2026-07-28 Stateless)
+
+By default the server uses stdio transport (for Claude Desktop, `npx` usage, etc.). You can also run it as a persistent HTTP server using the MCP 2.0 Streamable HTTP protocol with the 2026-07-28 stateless revision.
+
+In stateless mode, every MCP request is served by a fresh server instance — no `initialize` handshake, no `Mcp-Session-Id`, and requests are self-describing. This makes the HTTP server horizontally scalable and compatible with load balancers.
+
+```bash
+# Start the HTTP server
+npx -y @nitansde/mcp@latest --transport http --port 3001
+
+# Or with a local build
+node dist/index.js --transport http --port 3001
+```
+
+The MCP endpoint is available at `http://localhost:3001/mcp` (or `/`). Additional endpoints:
+
+- `GET /health` — health check (JSON)
+- `GET /auth` — auth page for Discourse User API key authorization
+- `POST /auth/callback` — complete auth flow
+
+Legacy 2025-era MCP clients are also served transparently (the handler falls back to a stateless 2025 lane automatically).
+
+The stdio transport remains the default and supports both 2025-era and 2026-07-28 protocol clients via `serveStdio`.
 
 ## Original README
 [Discourse MCP](https://github.com/discourse/discourse-mcp/blob/main/README.md)

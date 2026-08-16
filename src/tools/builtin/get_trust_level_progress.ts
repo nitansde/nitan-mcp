@@ -51,7 +51,7 @@ export const registerGetTrustLevelProgress: RegisterFn = (server, ctx) => {
       title: "Get Trust Level Progress",
       description:
         "Show a user's Discourse trust level progress toward the next level, with current stats vs requirements.",
-      inputSchema: schema.shape,
+      inputSchema: schema,
     },
     async ({ username }) => {
       try {

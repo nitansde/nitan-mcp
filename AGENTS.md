@@ -4,7 +4,7 @@
 - **Purpose**: a dedicated MCP server/CLI for **https://www.uscardforum.com/** with Cloudflare-aware request handling.
 - **Package / bin**: `@nitansde/mcp` → `nitan-mcp`
 - **Entry point**: `src/index.ts` → `dist/index.js`
-- **Runtime**: Node.js 18+, `@modelcontextprotocol/sdk`, Zod
+- **Runtime**: Node.js 20+, `@modelcontextprotocol/server` (v2 SDK), Zod v4
 - **Default site**: `https://www.uscardforum.com/`
 
 This repo started from Discourse MCP, but the current project is opinionated for uscardforum.com and should be documented and operated as such.

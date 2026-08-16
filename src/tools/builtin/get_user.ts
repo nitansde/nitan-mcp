@@ -12,7 +12,7 @@ export const registerGetUser: RegisterFn = (server, ctx) => {
     {
       title: "Get User",
       description: "Get basic user info.",
-      inputSchema: schema.shape,
+      inputSchema: schema,
     },
     async ({ username }, _extra: any) => {
       try {

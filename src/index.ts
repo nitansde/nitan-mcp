@@ -4,22 +4,22 @@
 const nodeVersion = process.versions.node;
 const majorVersion = parseInt(nodeVersion.split('.')[0], 10);
 
-if (majorVersion < 18) {
-  console.error(`Error: Node.js 18 or higher is required. You are using Node.js ${nodeVersion}.`);
+if (majorVersion < 20) {
+  console.error(`Error: Node.js 20 or higher is required. You are using Node.js ${nodeVersion}.`);
   console.error(`Please upgrade Node.js:`);
   console.error(`  - Download from https://nodejs.org/`);
-  console.error(`  - Or use nvm: nvm install 18 && nvm use 18`);
+  console.error(`  - Or use nvm: nvm install 20 && nvm use 20`);
   process.exit(1);
 }
 
 import { readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { toNodeHandler } from "@modelcontextprotocol/node";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
+import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import { generateUserApiKey, completeUserApiKeyFromState, parseGenerateUserApiKeyArgs, generateKeyPair, generateClientId, buildAuthorizationUrl, decryptPayload, saveToProfile } from "./user-api-key-generator.js";
 import { getDefaultProfilePath } from "./util/paths.js";
@@ -552,18 +552,6 @@ Options:
     },
   });
 
-  const server = new McpServer(
-    {
-      name: "@discourse/mcp",
-      version,
-    },
-    {
-      capabilities: {
-        tools: { listChanged: false },
-      },
-    }
-  );
-
   let hideSelectSite = false;
   if (config.site) {
     try {
@@ -575,27 +563,37 @@ Options:
     }
   }
 
-  await registerAllTools(server as any, siteState, logger, {
+  const toolOpts = {
     hideSelectSite,
     defaultSearchPrefix: config.default_search,
     maxReadLength: config.max_read_length,
-  });
+  } as const;
+
+  function buildServer(): McpServer {
+    const server = new McpServer(
+      {
+        name: "@discourse/mcp",
+        version,
+      },
+      {
+        capabilities: {
+          tools: {},
+        },
+      }
+    );
+    registerAllTools(server as any, siteState, logger, toolOpts);
+    return server;
+  }
 
   // Create transport based on configuration
   if (config.transport === "http") {
-    // HTTP transport using Streamable HTTP
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-      enableJsonResponse: true,
-    });
-
-    await server.connect(transport);
+    // MCP 2.0 / 2026-07-28 stateless Streamable HTTP.
+    // createMcpHandler invokes the factory per request — no sessions, no initialize.
+    const mcpHandler = createMcpHandler(() => buildServer());
+    const handleMcp = toNodeHandler(mcpHandler);
 
     const startedAt = new Date().toISOString();
 
-    // Auth state for unauthenticated servers — generate keypair at startup,
-    // auth URL is built per-request using the Host header so the callback
-    // automatically matches however the client reached us (Funnel, Tailscale DNS, localhost).
     const hasAuth = Boolean(config.site && siteState.hasAuthForSite(config.site));
     let pendingAuthKeys: {
       publicKey: string;
@@ -768,7 +766,6 @@ Options:
               throw new Error("Invalid response: missing 'key' field");
             }
             await saveToProfile(resolvedProfilePath, config.site, result.key, pendingAuthKeys.clientId);
-            // 热更新内存中的 auth，无需重启
             siteState.updateAuthOverride({
               site: config.site,
               user_api_key: result.key,
@@ -816,7 +813,6 @@ Options:
           const keyPair = generateKeyPair();
           const nonce = Date.now().toString();
           const clientId = generateClientId();
-          // 清除内存中的 auth
           if (config.site) siteState.removeAuthOverride(config.site);
           pendingAuthKeys = { publicKey: keyPair.publicKey, privateKey: keyPair.privateKey, nonce, clientId };
           res.writeHead(200, { "Content-Type": "application/json" });
@@ -829,24 +825,9 @@ Options:
         return;
       }
 
-      // MCP endpoint - handle via StreamableHTTPServerTransport
+      // MCP endpoint — stateless 2026-07-28 Streamable HTTP via createMcpHandler
       if (parsedUrl.pathname === "/mcp" || parsedUrl.pathname === "/") {
-        let body = "";
-        req.on("data", (chunk) => {
-          body += chunk;
-        });
-        req.on("end", async () => {
-          try {
-            const parsedBody = body ? JSON.parse(body) : undefined;
-            await transport.handleRequest(req, res, parsedBody);
-          } catch (error) {
-            logger.error(`Request handling error: ${error}`);
-            if (!res.headersSent) {
-              res.writeHead(500, { "Content-Type": "application/json" });
-              res.end(JSON.stringify({ error: "Internal server error" }));
-            }
-          }
-        });
+        await handleMcp(req, res);
         return;
       }
 
@@ -856,7 +837,7 @@ Options:
     });
 
     httpServer.listen(config.port, () => {
-      logger.info(`HTTP transport listening on port ${config.port}`);
+      logger.info(`HTTP transport listening on port ${config.port} (MCP 2.0 / 2026-07-28 stateless)`);
       logger.info(`Health check available at http://localhost:${config.port}/health`);
       logger.info(`MCP endpoint available at http://localhost:${config.port}/mcp`);
       if (pendingAuthKeys) {
@@ -871,10 +852,10 @@ Options:
       exiting = true;
       void (async () => {
         await siteState.dispose();
+        await mcpHandler.close();
         await new Promise<void>((resolve) => {
           httpServer.close(() => resolve());
         });
-        await transport.close();
         logger.info("HTTP server closed");
         process.exit(0);
       })().catch((e) => {
@@ -885,23 +866,24 @@ Options:
     process.on("SIGTERM", onExit);
     process.on("SIGINT", onExit);
   } else {
-    // Default stdio transport
-    const transport = new StdioServerTransport();
+    // Default stdio transport — supports both 2025-era and 2026-07-28 clients.
+    // serveStdio creates one McpServer per connection and handles era negotiation.
+    const { close } = serveStdio(() => buildServer());
 
-    // Exit cleanly on stdin close or SIGTERM
     let exiting = false;
     const onExit = () => {
       if (exiting) return;
       exiting = true;
-      void siteState.dispose().finally(() => {
+      void (async () => {
+        await close();
+        await siteState.dispose();
+      })().finally(() => {
         process.exit(0);
       });
     };
     process.on("SIGTERM", onExit);
     process.on("SIGINT", onExit);
     process.stdin.on("close", onExit);
-
-    await server.connect(transport);
   }
 }
 

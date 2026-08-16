@@ -25,7 +25,7 @@ export const registerSearch: RegisterFn = (server, ctx) => {
     {
       title: "Discourse Search",
       description: "Search site content with optional sorting.",
-      inputSchema: baseSchema.shape,
+      inputSchema: baseSchema,
     },
     async (args, _extra: any) => {
       // Validate with refined schema

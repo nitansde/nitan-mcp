@@ -8,7 +8,7 @@ export const registerListCategories: RegisterFn = (server, ctx) => {
     {
       title: "List Categories",
       description: "List categories visible to the current auth context.",
-      inputSchema: schema.shape,
+      inputSchema: schema,
     },
     async (_args, _extra: any) => {
       try {

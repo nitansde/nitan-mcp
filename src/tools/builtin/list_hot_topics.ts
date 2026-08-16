@@ -21,7 +21,7 @@ export const registerListHotTopics: RegisterFn = (server, ctx) => {
     {
       title: "List Hot Topics",
       description: "Get the current hot/trending topics from the forum. Hot topics are based on recent activity, views, and engagement.",
-      inputSchema: schema.shape,
+      inputSchema: schema,
     },
     async ({ limit = 10 }, _extra: any) => {
       try {

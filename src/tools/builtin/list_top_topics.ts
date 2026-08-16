@@ -25,7 +25,7 @@ export const registerListTopTopics: RegisterFn = (server, ctx) => {
     {
       title: "List Top Topics",
       description: "Get the top topics from the forum for a specific time period (daily, weekly, monthly, quarterly, yearly, or all time). Top topics are ranked by activity, views, and engagement.",
-      inputSchema: schema.shape,
+      inputSchema: schema,
     },
     async ({ period = "daily", limit = 10 }, _extra: any) => {
       try {
