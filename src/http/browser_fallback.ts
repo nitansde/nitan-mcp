@@ -520,6 +520,7 @@ export class BrowserFallbackClient {
   private async launchPlaywrightPersistentContext(chromium: any, profileSelection: BrowserProfileSelection): Promise<any> {
     return await chromium.launchPersistentContext(profileSelection.userDataDir, {
       channel: "chrome",
+      chromiumSandbox: true,
       headless: false,
       viewport: { width: 1366, height: 900 },
       args: [`--profile-directory=${profileSelection.profileDirectory}`],

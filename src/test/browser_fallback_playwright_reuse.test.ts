@@ -96,7 +96,9 @@ function createFakePlaywrightModule() {
   return {
     module: {
       chromium: {
-        launchPersistentContext: async () => {
+        launchPersistentContext: async (_userDataDir: string, options: { channel: string; chromiumSandbox?: boolean }) => {
+          assert.equal(options.channel, "chrome");
+          assert.equal(options.chromiumSandbox, true, "browser fallback must enable Chromium sandboxing");
           launchPersistentContextCalls += 1;
           return context;
         },
@@ -176,7 +178,9 @@ function createSingletonLockThenRecoverPlaywrightModule() {
   return {
     module: {
       chromium: {
-        launchPersistentContext: async () => {
+        launchPersistentContext: async (_userDataDir: string, options: { channel: string; chromiumSandbox?: boolean }) => {
+          assert.equal(options.channel, "chrome");
+          assert.equal(options.chromiumSandbox, true, "browser fallback must enable Chromium sandboxing");
           launchPersistentContextCalls += 1;
           if (launchPersistentContextCalls === 1) {
             throw new Error("Failed to create a ProcessSingleton for your profile directory. This usually means that the profile is already in use by another instance of Chromium.");
@@ -247,7 +251,9 @@ function createJsonResponsePlaywrightModule() {
   return {
     module: {
       chromium: {
-        launchPersistentContext: async () => {
+        launchPersistentContext: async (_userDataDir: string, options: { channel: string; chromiumSandbox?: boolean }) => {
+          assert.equal(options.channel, "chrome");
+          assert.equal(options.chromiumSandbox, true, "browser fallback must enable Chromium sandboxing");
           launchPersistentContextCalls += 1;
           return context;
         },
@@ -324,7 +330,9 @@ function createChallengeThenRecoverPlaywrightModule() {
   return {
     module: {
       chromium: {
-        launchPersistentContext: async () => {
+        launchPersistentContext: async (_userDataDir: string, options: { channel: string; chromiumSandbox?: boolean }) => {
+          assert.equal(options.channel, "chrome");
+          assert.equal(options.chromiumSandbox, true, "browser fallback must enable Chromium sandboxing");
           launchPersistentContextCalls += 1;
           return context;
         },
@@ -403,7 +411,9 @@ function createHeaderAwareGetPlaywrightModule() {
   return {
     module: {
       chromium: {
-        launchPersistentContext: async () => {
+        launchPersistentContext: async (_userDataDir: string, options: { channel: string; chromiumSandbox?: boolean }) => {
+          assert.equal(options.channel, "chrome");
+          assert.equal(options.chromiumSandbox, true, "browser fallback must enable Chromium sandboxing");
           launchPersistentContextCalls += 1;
           return context;
         },
